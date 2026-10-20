@@ -12,7 +12,7 @@ The UI talks directly to the OpenBao HTTP API from the browser. There is no back
 docker compose up --build
 ```
 
-Open http://localhost:8080 and connect to `http://localhost:8200` with token `root`. This starts a throwaway in-memory OpenBao dev server (CORS pre-configured for the UI) and the UI. Not for production.
+Open http://localhost:8080 and connect to `http://localhost:8200` with token `root`. This starts a throwaway in-memory OpenBao dev server (CORS pre-configured for the UI and for OpenBao's own web UI at `:8200`) and the UI. Not for production.
 
 To run just the UI image: `docker build -t envbao-admin . && docker run -p 8080:80 envbao-admin`.
 
@@ -30,17 +30,7 @@ Dev mode already mounts `secret/` as KV v2. Then enable CORS and userpass (below
 
 ### CORS
 
-The browser must be allowed to call OpenBao from the UI's origin. Either set it in the server config:
-
-```hcl
-listener "tcp" {
-  address     = "0.0.0.0:8200"
-  tls_disable = false
-  # ...
-}
-```
-
-and then configure CORS at runtime:
+The browser calls OpenBao directly, so OpenBao must allow the UI's origin. CORS is configured at runtime through the API (it is not a listener setting):
 
 ```sh
 bao write sys/config/cors \
@@ -49,7 +39,24 @@ bao write sys/config/cors \
   allowed_headers="X-Vault-Token,Content-Type"
 ```
 
-Use your real UI origin in production.
+`allowed_origins` is a comma-separated list of exact origins (scheme + host + port):
+
+| Where the UI runs | Origin to allow |
+| --- | --- |
+| `npm run dev` | `http://localhost:5173` |
+| Docker image / compose | `http://localhost:8080` |
+| Production | your real UI origin, e.g. `https://envbao.example.com` |
+| OpenBao's own web UI (`/ui`), if you also use it | OpenBao's own address, e.g. `http://localhost:8200` |
+
+The last row is easy to miss: once CORS is enabled, OpenBao rejects any request whose `Origin` is not listed, including requests from its own web UI, which fails with "origin not allowed". For example, to use both the admin UI from `npm run dev` and OpenBao's own UI:
+
+```sh
+bao write sys/config/cors enabled=true \
+  allowed_origins="http://localhost:5173,http://localhost:8200" \
+  allowed_headers="X-Vault-Token,Content-Type"
+```
+
+Writing `sys/config/cors` replaces the whole list, so include every origin each time.
 
 ### Auth method and secrets engine
 
@@ -118,7 +125,7 @@ envbao.example.com {
 }
 ```
 
-The OpenBao URL is entered on the Connect screen. Add the UI's origin to OpenBao's CORS allowed origins.
+The OpenBao URL is entered on the Connect screen. Add the UI's origin to OpenBao's CORS allowed origins (see [CORS](#cors)).
 
 CI runs on Gitea Actions (`.gitea/workflows/`): lint, test, build.
 
