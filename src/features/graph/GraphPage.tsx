@@ -17,10 +17,12 @@ import { layoutColumns } from '../../model/layout'
 import { RequireConnection } from '../shared/RequireConnection'
 import { useAccessInputs } from '../shared/useAccessInputs'
 import { Details, type Selection } from './Details'
+import { GrantEdge, type GrantEdgeData } from './GraphEdge'
 import { GraphNodeCard } from './GraphNode'
 
 // Defined once, outside the component, so React Flow doesn't re-register node types on every render.
 const nodeTypes = { gnode: GraphNodeCard }
+const edgeTypes = { grant: GrantEdge }
 
 // A grant with everything is easier to read as one word than as seven.
 const FULL = ['create', 'read', 'update', 'delete', 'list', 'sudo']
@@ -29,7 +31,7 @@ function capabilityLabel(caps: string[] | undefined): string | undefined {
   return FULL.every((c) => caps.includes(c)) ? 'full access' : caps.join(', ')
 }
 
-function toFlow(graph: AccessGraph, selected: Selection | null): { nodes: Node[]; edges: Edge[] } {
+function toFlow(graph: AccessGraph, selected: Selection | null, onEdgeSelect: (id: string) => void): { nodes: Node[]; edges: Edge[] } {
   const pos = layoutColumns(graph)
   const nodes: Node[] = graph.nodes.map((n) => ({
     id: n.id,
@@ -46,17 +48,27 @@ function toFlow(graph: AccessGraph, selected: Selection | null): { nodes: Node[]
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
   }))
-  const edges: Edge[] = graph.edges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    label: capabilityLabel(e.capabilities),
-    labelStyle: { fill: 'var(--ink-soft)', fontSize: 12 },
-    labelBgStyle: { fill: 'var(--surface-sunken)' },
-    labelBgPadding: [6, 3],
-    markerEnd: { type: MarkerType.ArrowClosed },
-    selected: selected?.kind === 'edge' && selected.id === e.id,
-  }))
+  // Edges into the same node get their labels stacked a little apart so they stay legible.
+  const intoTarget = new Map<string, string[]>()
+  for (const e of graph.edges) if (e.capabilities) intoTarget.set(e.target, [...(intoTarget.get(e.target) ?? []), e.id])
+  const edges: Edge[] = graph.edges.map((e) => {
+    const base = {
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      markerEnd: { type: MarkerType.ArrowClosed },
+      selected: selected?.kind === 'edge' && selected.id === e.id,
+    }
+    const label = capabilityLabel(e.capabilities)
+    if (!label) return base
+    const siblings = intoTarget.get(e.target) ?? []
+    const data: GrantEdgeData = {
+      label,
+      offset: (siblings.indexOf(e.id) - (siblings.length - 1) / 2) * 24,
+      onSelect: () => onEdgeSelect(e.id),
+    }
+    return { ...base, type: 'grant', data: data as unknown as Record<string, unknown> }
+  })
   return { nodes, edges }
 }
 
@@ -76,7 +88,10 @@ function GraphView({ client }: { client: BaoClient }) {
     () => (full ? filterGraph(full, { identity, path, hidePolicies: hideDefault ? ['default'] : [] }) : null),
     [full, identity, path, hideDefault],
   )
-  const flow = useMemo(() => (shown ? toFlow(shown, selected) : null), [shown, selected])
+  const flow = useMemo(
+    () => (shown ? toFlow(shown, selected, (id) => setSelected({ kind: 'edge', id })) : null),
+    [shown, selected],
+  )
 
   if (inputs.isPending) return <p>Loading…</p>
   if (inputs.error) return <p role="alert">{inputs.error.message}</p>
@@ -132,6 +147,7 @@ function GraphView({ client }: { client: BaoClient }) {
               nodes={flow.nodes}
               edges={flow.edges}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               fitView
               nodesDraggable={false}
               nodesConnectable={false}

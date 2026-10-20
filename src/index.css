@@ -1316,3 +1316,23 @@ button.danger-solid:hover:not(:disabled) {
   border-color: transparent;
   color: var(--accent);
 }
+
+/* Capability label on a policy -> path edge. */
+.edge-label {
+  position: absolute;
+  pointer-events: all;
+  padding: 1px 6px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.edge-label-selected {
+  border-color: var(--accent);
+  color: var(--accent);
+}

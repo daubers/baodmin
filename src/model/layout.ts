@@ -1,6 +1,6 @@
 import type { AccessGraph, GraphNode } from './graph'
 
-export const COLUMN_X = { identity: 0, policy: 380, path: 780 } as const
+export const COLUMN_X = { identity: 0, policy: 380, path: 860 } as const
 export const ROW_HEIGHT = 72
 
 export interface Position {
