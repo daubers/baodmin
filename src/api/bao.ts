@@ -20,6 +20,8 @@ export interface BaoHealth {
   standby: boolean
   version: string
   cluster_name?: string
+  /** Unix seconds. */
+  server_time_utc?: number
 }
 
 export interface TokenInfo {

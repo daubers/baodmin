@@ -7,8 +7,8 @@ test('README embeds the tested admin policy verbatim', () => {
 })
 
 test('README documents every origin the docker-compose setup allows', () => {
-  const compose = readFileSync('docker-compose.yml', 'utf8')
-  const origins = /allowed_origins=([^"]+)"/.exec(compose)![1].split(',')
+  const seed = readFileSync('docker/seed.sh', 'utf8')
+  const origins = /allowed_origins="([^"]+)"/.exec(seed)![1].split(',')
   const readme = readFileSync('README.md', 'utf8')
   for (const o of origins) expect(readme).toContain(o)
 })

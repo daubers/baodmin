@@ -31,6 +31,8 @@ docker compose up --build
 
 Open http://localhost:8080 and connect to `http://localhost:8200` with token `root`. This starts a throwaway in-memory OpenBao dev server (CORS pre-configured for the UI and for OpenBao's own web UI at `:8200`) and the UI. Not for production.
 
+The stack also loads sample data from [`docker/seed.sh`](docker/seed.sh): five secrets under `secret/` (`app/`, `shared/`, `team-a/`), userpass users `alice`, `bob` and `carol` (password `password123`), entities for alice and bob, a `platform` group, a few grants, and a `ci-deploy` token. Edit the script to change it. If you already have the stack running, `docker compose down` first: the setup step only runs on a fresh start.
+
 To run just the UI image: `docker build -t envbao-admin . && docker run -p 8080:80 envbao-admin`.
 
 ## OpenBao setup

@@ -30,6 +30,14 @@ const state = (over: Partial<grants.GrantState> = {}): grants.GrantState => ({
 beforeEach(() => {
   vi.mocked(grants.getGrantState).mockResolvedValue(state())
   vi.mocked(secrets.listKvMounts).mockResolvedValue([{ path: 'secret/' }])
+  vi.mocked(secrets.listSecrets).mockImplementation(async (_c, _m, prefix) =>
+    prefix === ''
+      ? [
+          { name: 'app/', path: 'app/', isFolder: true },
+          { name: 'shared', path: 'shared', isFolder: false },
+        ]
+      : [{ name: 'db', path: 'app/db', isFolder: false }],
+  )
   vi.mocked(secrets.readPolicyHcl).mockResolvedValue('path "x" { capabilities = ["read"] }')
 })
 afterEach(() => vi.resetAllMocks())
@@ -54,6 +62,7 @@ test('shows managed grants and read-only other policies', async () => {
 test('grants KV access split into data and metadata rules', async () => {
   vi.mocked(grants.grantAccess).mockResolvedValue()
   const user = setup()
+  await user.click(await screen.findByRole('button', { name: 'Type a path instead' }))
   await user.type(await screen.findByLabelText('Secret path'), 'db/*')
   await user.click(screen.getByLabelText('update'))
   await user.click(screen.getByLabelText('list'))
@@ -64,8 +73,41 @@ test('grants KV access split into data and metadata rules', async () => {
   ])
 })
 
+test('grants a secret chosen from the browser', async () => {
+  vi.mocked(grants.grantAccess).mockResolvedValue()
+  const user = setup()
+  await user.click(await screen.findByRole('button', { name: 'Open app/' }))
+  await user.click(await screen.findByLabelText('db'))
+  await user.click(screen.getByRole('button', { name: 'Grant' }))
+  expect(grants.grantAccess).toHaveBeenCalledWith(client, target, [
+    { path: 'secret/data/app/db', capabilities: ['read'] },
+    { path: 'secret/metadata/app/db', capabilities: [] },
+  ])
+})
+
+test('ticking "everything inside" grants the folder wildcard', async () => {
+  vi.mocked(grants.grantAccess).mockResolvedValue()
+  const user = setup()
+  await user.click(await screen.findByRole('button', { name: 'Open app/' }))
+  await user.click(await screen.findByLabelText(/Everything inside/))
+  expect(screen.getByLabelText('db')).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Grant' }))
+  expect(grants.grantAccess).toHaveBeenCalledWith(client, target, [
+    { path: 'secret/data/app/*', capabilities: ['read'] },
+    { path: 'secret/metadata/app/*', capabilities: [] },
+  ])
+})
+
+test('asks for a choice before granting', async () => {
+  const user = setup()
+  await user.click(await screen.findByRole('button', { name: 'Grant' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Path is required')
+  expect(grants.grantAccess).not.toHaveBeenCalled()
+})
+
 test('validates the path and capabilities before calling the API', async () => {
   const user = setup()
+  await user.click(await screen.findByRole('button', { name: 'Type a path instead' }))
   await user.type(await screen.findByLabelText('Secret path'), '/bad')
   await user.click(screen.getByRole('button', { name: 'Grant' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('must not start with "/"')

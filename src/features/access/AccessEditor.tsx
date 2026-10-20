@@ -4,6 +4,7 @@ import type { BaoClient } from '../../api/bao'
 import { getGrantState, grantAccess, revokeAccess, type Target } from '../../api/grants'
 import { listKvMounts, readPolicyHcl } from '../../api/secrets'
 import { KV_CAPABILITIES, kvGrantRules, validateGrantPath, type KvCapability } from '../../model/managed'
+import { PathPicker } from './PathPicker'
 
 interface Props {
   client: BaoClient
@@ -66,80 +67,99 @@ export function AccessEditor({ client, target, onClose }: Props) {
 
   return (
     <section aria-label={`Access for ${target.name}`} className="access-editor">
-      <h2>
-        Access: {target.kind} “{target.name}”
-      </h2>
-      <button type="button" onClick={onClose}>
-        Close
-      </button>
+      <header className="access-head">
+        <h2>
+          Access for <strong>{target.name}</strong> <span className="kind">{target.kind}</span>
+        </h2>
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
+      </header>
       {state.error && <p role="alert">{state.error.message}</p>}
       {s && (
-        <>
-          <h3>Granted by EnvBao</h3>
-          {s.managed && !s.managed.editable && (
-            <p role="alert">
-              This policy was changed outside EnvBao and is read-only here: {s.managed.reasons.join('; ')}
-            </p>
-          )}
-          {s.managed?.grants.length ? (
-            <table aria-label="Granted by EnvBao">
-              <thead>
-                <tr>
-                  <th>Path</th>
-                  <th>Capabilities</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {s.managed.grants.map((g) => (
-                  <tr key={g.path}>
-                    <td>
-                      <code>{g.path}</code>
-                    </td>
-                    <td>{g.capabilities.join(', ')}</td>
-                    <td>
-                      <button
-                        type="button"
-                        aria-label={`Revoke ${g.path}`}
-                        disabled={!editable}
-                        onClick={() => window.confirm(`Revoke ${g.capabilities.join(', ')} on ${g.path}?`) && revoke.mutate(g.path)}
-                      >
-                        Revoke
-                      </button>
-                    </td>
+        <div className="access-body">
+          <div className="access-current">
+            <div className="section-head">
+              <h3>Granted by EnvBao</h3>
+              {s.hcl && (
+                <button type="button" className="link" aria-expanded={showRaw} onClick={() => setShowRaw(!showRaw)}>
+                  {showRaw ? 'Hide' : 'Show'} policy HCL ({s.policyName})
+                </button>
+              )}
+            </div>
+            {s.managed && !s.managed.editable && (
+              <p role="alert">
+                This policy was changed outside EnvBao and is read-only here: {s.managed.reasons.join('; ')}
+              </p>
+            )}
+            {showRaw && <pre>{s.hcl}</pre>}
+            {s.managed?.grants.length ? (
+              <table aria-label="Granted by EnvBao">
+                <thead>
+                  <tr>
+                    <th>Path</th>
+                    <th>Capabilities</th>
+                    <th />
                   </tr>
+                </thead>
+                <tbody>
+                  {s.managed.grants.map((g) => (
+                    <tr key={g.path}>
+                      <td>
+                        <code>{g.path}</code>
+                      </td>
+                      <td>{g.capabilities.join(', ')}</td>
+                      <td>
+                        <button
+                          type="button"
+                          aria-label={`Revoke ${g.path}`}
+                          disabled={!editable}
+                          onClick={() => window.confirm(`Revoke ${g.capabilities.join(', ')} on ${g.path}?`) && revoke.mutate(g.path)}
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="hint">No access granted through EnvBao yet.</p>
+            )}
+            {revoke.error && <p role="alert">{revoke.error.message}</p>}
+
+            <h3>Other policies</h3>
+            <p className="hint">Set outside EnvBao, so they can only be viewed here.</p>
+            {s.otherPolicies.length ? (
+              <ul className="policy-list">
+                {s.otherPolicies.map((p) => (
+                  <PolicyView key={p} client={client} name={p} />
                 ))}
-              </tbody>
-            </table>
-          ) : (
-            <p>No access granted through EnvBao yet.</p>
-          )}
-          {s.hcl && (
-            <p>
-              <button type="button" aria-expanded={showRaw} onClick={() => setShowRaw(!showRaw)}>
-                {showRaw ? 'Hide' : 'Show'} policy HCL ({s.policyName})
-              </button>
-            </p>
-          )}
-          {showRaw && <pre>{s.hcl}</pre>}
-          {revoke.error && <p role="alert">{revoke.error.message}</p>}
+              </ul>
+            ) : (
+              <p className="hint">None.</p>
+            )}
+          </div>
 
           {editable && (
-            <form onSubmit={submit} aria-label="Grant access">
+            <form onSubmit={submit} aria-label="Grant access" className="access-grant">
               <h3>Grant access</h3>
               <label>
                 Secrets engine
-                <select value={mount} onChange={(e) => setMount(e.target.value)}>
+                <select
+                  value={mount}
+                  onChange={(e) => {
+                    setMount(e.target.value)
+                    setSecretPath('')
+                  }}
+                >
                   {mounts.data?.map((m) => (
                     <option key={m.path}>{m.path}</option>
                   ))}
                 </select>
               </label>
-              <label>
-                Secret path
-                <input value={secretPath} onChange={(e) => setSecretPath(e.target.value)} placeholder="app/db or app/*" />
-              </label>
-              <fieldset>
+              {mount && <PathPicker key={mount} client={client} mount={mount} value={secretPath} onChange={setSecretPath} />}
+              <fieldset className="caps">
                 <legend>Capabilities</legend>
                 {KV_CAPABILITIES.map((c) => (
                   <label key={c} className="check">
@@ -154,7 +174,6 @@ export function AccessEditor({ client, target, onClose }: Props) {
               </fieldset>
               <p className="hint">
                 Granting a path that already has a grant replaces its capabilities. “list” applies to the secret’s metadata path.
-                A trailing * matches everything below.
               </p>
               {(formError || grant.error) && <p role="alert">{formError ?? grant.error?.message}</p>}
               <button type="submit" disabled={grant.isPending || !mount}>
@@ -162,18 +181,7 @@ export function AccessEditor({ client, target, onClose }: Props) {
               </button>
             </form>
           )}
-
-          <h3>Other policies (not managed by EnvBao, read-only)</h3>
-          {s.otherPolicies.length ? (
-            <ul>
-              {s.otherPolicies.map((p) => (
-                <PolicyView key={p} client={client} name={p} />
-              ))}
-            </ul>
-          ) : (
-            <p>None.</p>
-          )}
-        </>
+        </div>
       )}
     </section>
   )

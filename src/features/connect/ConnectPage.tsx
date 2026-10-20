@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { BaoClient, BaoError, type BaoHealth } from '../../api/bao'
 import { useSession } from '../../api/useSession'
+import { ConnectionSummary } from './ConnectionSummary'
 
 type Mode = 'token' | 'userpass'
 
@@ -43,17 +44,19 @@ export function ConnectPage() {
     }
   }
 
+  if (client && tokenInfo) {
+    return (
+      <section>
+        <h1>Connection</h1>
+        <ConnectionSummary client={client} tokenInfo={tokenInfo} onDisconnect={disconnect} />
+      </section>
+    )
+  }
+
   return (
     <section>
       <h1>Connect</h1>
-      {client && tokenInfo && (
-        <p role="status">
-          Connected to {client.baseUrl} as {tokenInfo.display_name || 'token'} (policies: {tokenInfo.policies.join(', ')}){' '}
-          <button type="button" onClick={disconnect}>
-            Disconnect
-          </button>
-        </p>
-      )}
+      <p className="hint">Connect to an OpenBao server to manage its identities and who can reach which secrets.</p>
       <form onSubmit={submit}>
         <label>
           OpenBao URL
