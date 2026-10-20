@@ -1,4 +1,4 @@
-export type BaoErrorKind = 'network' | 'auth' | 'forbidden' | 'not-found' | 'server' | 'bad-response'
+export type BaoErrorKind = 'network' | 'auth' | 'forbidden' | 'not-found' | 'unavailable' | 'server' | 'bad-response'
 
 export class BaoError extends Error {
   readonly kind: BaoErrorKind
@@ -49,7 +49,10 @@ export function normaliseBaseUrl(url: string): string {
   return trimmed
 }
 
+export const REQUEST_TIMEOUT_MS = 15_000
+
 function kindForStatus(status: number): BaoErrorKind {
+  if (status === 503) return 'unavailable'
   if (status === 401) return 'auth'
   if (status === 403) return 'forbidden'
   if (status === 404) return 'not-found'
@@ -80,8 +83,12 @@ export class BaoClient {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
-    } catch {
+    } catch (e) {
+      if (e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+        throw new BaoError('network', `OpenBao did not respond within ${REQUEST_TIMEOUT_MS / 1000} seconds.`)
+      }
       throw new BaoError('network', CORS_HINT)
     }
 
@@ -100,7 +107,9 @@ export class BaoClient {
       const message =
         res.status === 401 || res.status === 403
           ? errors.join('; ') || 'Permission denied'
-          : errors.join('; ') || `OpenBao returned HTTP ${res.status}`
+          : res.status === 503
+            ? 'OpenBao is sealed or unavailable.'
+            : errors.join('; ') || `OpenBao returned HTTP ${res.status}`
       throw new BaoError(kindForStatus(res.status), message, res.status, errors)
     }
     return json as T

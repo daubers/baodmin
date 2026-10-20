@@ -47,9 +47,26 @@ describe('BaoClient', () => {
     [403, 'forbidden'],
     [404, 'not-found'],
     [500, 'server'],
+    [503, 'unavailable'],
   ])('maps HTTP %i to %s', async (status, kind) => {
     mockFetch(status, { errors: ['nope'] })
     await expect(new BaoClient('http://b').request('GET', 'x')).rejects.toMatchObject({ kind, status })
+  })
+
+  test('503 explains that OpenBao is sealed or unavailable', async () => {
+    mockFetch(503, { errors: ['Vault is sealed'] })
+    await expect(new BaoClient('http://b').request('GET', 'x')).rejects.toThrow('sealed or unavailable')
+  })
+
+  test('a timeout is reported as such, not as a CORS problem', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('slow', 'TimeoutError')))
+    await expect(new BaoClient('http://b').request('GET', 'x')).rejects.toThrow('did not respond within')
+  })
+
+  test('passes a timeout signal to fetch', async () => {
+    const fn = mockFetch(200, {})
+    await new BaoClient('http://b').request('GET', 'x')
+    expect((fn.mock.calls[0] as unknown as [string, RequestInit])[1].signal).toBeInstanceOf(AbortSignal)
   })
 
   test('non-JSON success is a bad-response', async () => {

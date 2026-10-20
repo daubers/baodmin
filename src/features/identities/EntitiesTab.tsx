@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { addAlias, deleteAlias, deleteEntity, listEntities, saveEntity, userpassAccessor, type Entity } from '../../api/identities'
 import { AccessEditor } from '../access/AccessEditor'
+import { ListState } from '../shared/ListState'
 import { PolicyPicker } from '../shared/PolicyPicker'
 
 interface Draft {
@@ -55,8 +56,9 @@ export function EntitiesTab({ client }: { client: BaoClient }) {
 
   return (
     <section>
-      {entities.error && <p role="alert">{entities.error.message}</p>}
-      <table>
+      <ListState query={entities} empty="No entities yet." />
+      {!!entities.data?.length && (
+      <table aria-label="Entities">
         <thead>
           <tr>
             <th>Entity</th>
@@ -72,14 +74,15 @@ export function EntitiesTab({ client }: { client: BaoClient }) {
               <td>{e.aliases.map((a) => a.name).join(', ') || '—'}</td>
               <td>{e.policies.join(', ') || '—'}</td>
               <td>
-                <button type="button" onClick={() => setAccessFor(e.name)}>
+                <button type="button" aria-label={`Access ${e.name}`} onClick={() => setAccessFor(e.name)}>
                   Access
                 </button>{' '}
-                <button type="button" onClick={() => setDraft({ name: e.name, policies: e.policies, isNew: false, entity: e })}>
+                <button type="button" aria-label={`Edit ${e.name}`} onClick={() => setDraft({ name: e.name, policies: e.policies, isNew: false, entity: e })}>
                   Edit
                 </button>{' '}
                 <button
                   type="button"
+                  aria-label={`Delete ${e.name}`}
                   onClick={() => window.confirm(`Delete entity "${e.name}" and its aliases?`) && remove.mutate(e.name)}
                 >
                   Delete
@@ -89,6 +92,7 @@ export function EntitiesTab({ client }: { client: BaoClient }) {
           ))}
         </tbody>
       </table>
+      )}
       {remove.error && <p role="alert">{remove.error.message}</p>}
       {!draft && (
         <button type="button" onClick={() => setDraft({ name: '', policies: [], isNew: true })}>

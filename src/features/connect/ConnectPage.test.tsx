@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, test, vi } from 'vitest'
 import { SessionProvider } from '../../api/session'
+import { Providers } from '../../test/providers'
 import { ConnectPage } from './ConnectPage'
 
 const health = { initialized: true, sealed: false, standby: false, version: '2.1.0' }
@@ -11,9 +12,11 @@ afterEach(() => vi.unstubAllGlobals())
 
 function setup() {
   render(
-    <SessionProvider>
-      <ConnectPage />
-    </SessionProvider>,
+    <Providers>
+      <SessionProvider>
+        <ConnectPage />
+      </SessionProvider>
+    </Providers>,
   )
   return userEvent.setup()
 }

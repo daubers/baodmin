@@ -17,7 +17,7 @@ function PolicyView({ client, name }: { client: BaoClient; name: string }) {
   return (
     <li>
       {name}{' '}
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button type="button" aria-label={`${open ? 'Hide' : 'View'} ${name}`} aria-expanded={open} onClick={() => setOpen(!open)}>
         {open ? 'Hide' : 'View'}
       </button>
       {open && <pre>{hcl.isPending ? 'Loading…' : (hcl.data ?? 'Could not read this policy.')}</pre>}
@@ -82,7 +82,7 @@ export function AccessEditor({ client, target, onClose }: Props) {
             </p>
           )}
           {s.managed?.grants.length ? (
-            <table>
+            <table aria-label="Granted by EnvBao">
               <thead>
                 <tr>
                   <th>Path</th>
@@ -100,6 +100,7 @@ export function AccessEditor({ client, target, onClose }: Props) {
                     <td>
                       <button
                         type="button"
+                        aria-label={`Revoke ${g.path}`}
                         disabled={!editable}
                         onClick={() => window.confirm(`Revoke ${g.capabilities.join(', ')} on ${g.path}?`) && revoke.mutate(g.path)}
                       >

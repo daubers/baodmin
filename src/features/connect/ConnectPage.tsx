@@ -5,8 +5,8 @@ import { useSession } from '../../api/useSession'
 type Mode = 'token' | 'userpass'
 
 export function ConnectPage() {
-  const { client, tokenInfo, connect, disconnect } = useSession()
-  const [url, setUrl] = useState(client?.baseUrl ?? 'http://127.0.0.1:8200')
+  const { client, tokenInfo, lastUrl, connect, disconnect } = useSession()
+  const [url, setUrl] = useState(client?.baseUrl ?? lastUrl ?? 'http://127.0.0.1:8200')
   const [mode, setMode] = useState<Mode>('token')
   const [token, setToken] = useState('')
   const [username, setUsername] = useState('')

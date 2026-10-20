@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { deleteUser, listUsers, saveUser } from '../../api/identities'
 import { AccessEditor } from '../access/AccessEditor'
+import { ListState } from '../shared/ListState'
 import { PolicyPicker } from '../shared/PolicyPicker'
 
 interface Draft {
@@ -40,8 +41,9 @@ export function UsersTab({ client }: { client: BaoClient }) {
 
   return (
     <section>
-      {users.error && <p role="alert">{users.error.message}</p>}
-      <table>
+      <ListState query={users} empty="No users yet." />
+      {!!users.data?.length && (
+      <table aria-label="Users">
         <thead>
           <tr>
             <th>User</th>
@@ -55,14 +57,15 @@ export function UsersTab({ client }: { client: BaoClient }) {
               <td>{u.name}</td>
               <td>{u.policies.join(', ') || '—'}</td>
               <td>
-                <button type="button" onClick={() => setAccessFor(u.name)}>
+                <button type="button" aria-label={`Access ${u.name}`} onClick={() => setAccessFor(u.name)}>
                   Access
                 </button>{' '}
-                <button type="button" onClick={() => setDraft({ ...u, password: '', ttl: u.ttl ? `${u.ttl}s` : '', isNew: false })}>
+                <button type="button" aria-label={`Edit ${u.name}`} onClick={() => setDraft({ ...u, password: '', ttl: u.ttl ? `${u.ttl}s` : '', isNew: false })}>
                   Edit
                 </button>{' '}
                 <button
                   type="button"
+                  aria-label={`Delete ${u.name}`}
                   onClick={() => window.confirm(`Delete user "${u.name}"? This cannot be undone.`) && remove.mutate(u.name)}
                 >
                   Delete
@@ -72,6 +75,7 @@ export function UsersTab({ client }: { client: BaoClient }) {
           ))}
         </tbody>
       </table>
+      )}
       {remove.error && <p role="alert">{remove.error.message}</p>}
       {!draft && (
         <button type="button" onClick={() => setDraft(empty)}>

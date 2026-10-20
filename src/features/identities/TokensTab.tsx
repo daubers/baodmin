@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { createToken, listTokens, revokeToken, type CreatedToken } from '../../api/tokens'
 import { useSession } from '../../api/useSession'
+import { ListState } from '../shared/ListState'
 import { PolicyPicker } from '../shared/PolicyPicker'
 
 interface Draft {
@@ -76,8 +77,9 @@ export function TokensTab({ client }: { client: BaoClient }) {
           </button>
         </div>
       )}
-      {tokens.error && <p role="alert">{tokens.error.message}</p>}
-      <table>
+      <ListState query={tokens} empty="No tokens." />
+      {!!tokens.data?.length && (
+      <table aria-label="Tokens">
         <thead>
           <tr>
             <th>Name</th>
@@ -104,6 +106,7 @@ export function TokensTab({ client }: { client: BaoClient }) {
                 <td>
                   <button
                     type="button"
+                    aria-label={`Revoke ${t.display_name || t.accessor}`}
                     disabled={isSelf}
                     title={isSelf ? 'This is the token you are signed in with' : undefined}
                     onClick={() =>
@@ -119,6 +122,7 @@ export function TokensTab({ client }: { client: BaoClient }) {
           })}
         </tbody>
       </table>
+      )}
       {revoke.error && <p role="alert">{revoke.error.message}</p>}
       {!draft && (
         <button type="button" onClick={() => setDraft(empty)}>

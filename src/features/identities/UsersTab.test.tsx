@@ -45,7 +45,7 @@ test('creates a user with selected policies', async () => {
 
 test('editing keeps the username fixed and the password optional', async () => {
   const user = setup()
-  await user.click(await screen.findByRole('button', { name: 'Edit' }))
+  await user.click(await screen.findByRole('button', { name: 'Edit alice' }))
   expect(screen.getByLabelText('Username')).toBeDisabled()
   await user.click(await screen.findByLabelText('default'))
   await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -55,9 +55,9 @@ test('editing keeps the username fixed and the password optional', async () => {
 test('delete requires confirmation', async () => {
   const user = setup()
   const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
-  await user.click(await screen.findByRole('button', { name: 'Delete' }))
+  await user.click(await screen.findByRole('button', { name: 'Delete alice' }))
   expect(api.deleteUser).not.toHaveBeenCalled()
-  await user.click(screen.getByRole('button', { name: 'Delete' }))
+  await user.click(screen.getByRole('button', { name: 'Delete alice' }))
   expect(api.deleteUser).toHaveBeenCalledWith(client, 'alice')
   confirm.mockRestore()
 })

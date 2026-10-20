@@ -47,7 +47,7 @@ test('shows managed grants and read-only other policies', async () => {
   const user = setup()
   expect(await screen.findByText('secret/data/app/*')).toBeInTheDocument()
   const other = screen.getByText('default').closest('li')!
-  await user.click(within(other).getByRole('button', { name: 'View' }))
+  await user.click(within(other).getByRole('button', { name: 'View default' }))
   expect(await within(other).findByText(/capabilities/)).toBeInTheDocument()
 })
 
@@ -76,9 +76,9 @@ test('revoke asks for confirmation', async () => {
   vi.mocked(grants.revokeAccess).mockResolvedValue()
   const user = setup()
   const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
-  await user.click(await screen.findByRole('button', { name: 'Revoke' }))
+  await user.click(await screen.findByRole('button', { name: 'Revoke secret/data/app/*' }))
   expect(grants.revokeAccess).not.toHaveBeenCalled()
-  await user.click(screen.getByRole('button', { name: 'Revoke' }))
+  await user.click(screen.getByRole('button', { name: 'Revoke secret/data/app/*' }))
   expect(grants.revokeAccess).toHaveBeenCalledWith(client, target, ['secret/data/app/*'])
   confirm.mockRestore()
 })
@@ -89,7 +89,7 @@ test('a policy edited outside EnvBao is read-only', async () => {
   )
   setup()
   expect(await screen.findByRole('alert')).toHaveTextContent('changed outside EnvBao')
-  expect(screen.getByRole('button', { name: 'Revoke' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Revoke x' })).toBeDisabled()
   expect(screen.queryByRole('form', { name: 'Grant access' })).not.toBeInTheDocument()
 })
 

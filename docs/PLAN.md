@@ -11,7 +11,7 @@ EnvBao needs an admin UI over an OpenBao instance so users/tokens can be created
 ## Architecture
 - `src/api/bao.ts`: typed fetch client (`X-Vault-Token`, base URL config, error mapping). Endpoints: `sys/policies/acl`, `auth/userpass/users`, `auth/token/create|lookup|accessors`, `identity/entity|group`, `sys/mounts`, `secret/metadata` (KV v2), `sys/capabilities`.
 - `src/model/`: `buildAccessGraph()` — parses ACL policy HCL path rules into `{path, capabilities}`, joins with identities' attached policies → nodes/edges. Pure and unit-testable.
-- Managed-policy convention: UI generates one policy per (identity, secret path set) named `envbao-<identity>`, so grants are editable via a simple "secret path + capability checkboxes" form rather than raw HCL (raw HCL view available).
+- Managed-policy convention (as built): one policy per user/entity/group named `envbao-<kind>-<name>`, marked with an `# envbao-owner:` header; tokens cannot be granted to after creation. Originally planned as `envbao-<identity>`, so grants are editable via a simple "secret path + capability checkboxes" form rather than raw HCL (raw HCL view available).
 - UI libs: React Router, TanStack Query (server state), `@xyflow/react` (React Flow) + dagre layout for graph, Vitest for tests.
 
 ## Screens
