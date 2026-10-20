@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { RequireConnection } from '../shared/RequireConnection'
 import { EntitiesTab } from './EntitiesTab'
 import { GroupsTab } from './GroupsTab'
+import { TokensTab } from './TokensTab'
 import { UsersTab } from './UsersTab'
 
-const tabs = ['Users', 'Entities', 'Groups'] as const
+const tabs = ['Users', 'Entities', 'Groups', 'Tokens'] as const
 type Tab = (typeof tabs)[number]
 
 export function IdentitiesPage() {
@@ -25,6 +26,7 @@ export function IdentitiesPage() {
             {tab === 'Users' && <UsersTab client={client} />}
             {tab === 'Entities' && <EntitiesTab client={client} />}
             {tab === 'Groups' && <GroupsTab client={client} />}
+            {tab === 'Tokens' && <TokensTab client={client} />}
           </>
         )}
       </RequireConnection>
