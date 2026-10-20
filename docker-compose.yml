@@ -1,0 +1,36 @@
+# Local demo: the UI plus a throwaway in-memory OpenBao dev server.
+#   docker compose up --build
+# UI: http://localhost:8080   OpenBao: http://localhost:8200   token: root
+services:
+  openbao:
+    image: openbao/openbao:latest
+    cap_add: [IPC_LOCK]
+    environment:
+      BAO_DEV_ROOT_TOKEN_ID: root
+      BAO_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD", "bao", "status", "-address=http://127.0.0.1:8200"]
+      interval: 2s
+      retries: 15
+
+  # One-shot: allow the UI origin to call OpenBao from the browser.
+  openbao-setup:
+    image: openbao/openbao:latest
+    depends_on:
+      openbao:
+        condition: service_healthy
+    environment:
+      BAO_ADDR: http://openbao:8200
+      BAO_TOKEN: root
+    entrypoint: ["bao", "write", "sys/config/cors", "enabled=true", "allowed_origins=http://localhost:8080", "allowed_headers=X-Vault-Token,Content-Type"]
+    restart: "no"
+
+  ui:
+    build: .
+    depends_on:
+      openbao-setup:
+        condition: service_completed_successfully
+    ports:
+      - "8080:80"

@@ -6,6 +6,16 @@ Licensed under the [BSD 3-Clause License](LICENSE).
 
 The UI talks directly to the OpenBao HTTP API from the browser. There is no backend.
 
+## Quick start with Docker
+
+```sh
+docker compose up --build
+```
+
+Open http://localhost:8080 and connect to `http://localhost:8200` with token `root`. This starts a throwaway in-memory OpenBao dev server (CORS pre-configured for the UI) and the UI. Not for production.
+
+To run just the UI image: `docker build -t envbao-admin . && docker run -p 8080:80 envbao-admin`.
+
 ## OpenBao setup
 
 ### Quickstart (dev mode)
