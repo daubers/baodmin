@@ -115,3 +115,72 @@ pre {
   padding: 0.75rem;
   overflow-x: auto;
 }
+
+.graph-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 0.75rem;
+}
+
+.graph-toolbar label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.graph-legend {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.85em;
+  opacity: 0.7;
+  margin-bottom: 0.5rem;
+}
+
+.graph-layout {
+  display: grid;
+  grid-template-columns: 1fr 22rem;
+  gap: 1rem;
+}
+
+.graph-canvas {
+  height: 70vh;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.graph-details {
+  overflow: auto;
+  max-height: 70vh;
+}
+
+.gnode {
+  width: 300px;
+  font-size: 12px;
+  border-width: 2px;
+}
+
+.gnode-identity {
+  border-color: #2d7ff9;
+}
+
+.gnode-policy {
+  border-color: #8e44ad;
+}
+
+.gnode-managed {
+  border-style: solid;
+  font-weight: 600;
+}
+
+.gnode-missing {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.gnode-path {
+  border-color: #27ae60;
+}
+
+.gnode-selected {
+  box-shadow: 0 0 0 3px #d4a017;
+}
