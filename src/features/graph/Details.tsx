@@ -3,6 +3,7 @@ import type { BaoClient } from '../../api/bao'
 import { revokeAccess } from '../../api/grants'
 import type { AccessGraph, GraphEdge, GraphNode, PolicyInput } from '../../model/graph'
 import { parseManagedPolicy, type GrantTarget } from '../../model/managed'
+import { CapabilityChips } from '../shared/CapabilityChips'
 
 export type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: string }
 
@@ -17,65 +18,125 @@ interface Props {
 const nodeById = (g: AccessGraph, id: string) => g.nodes.find((n) => n.id === id)
 const label = (n: GraphNode | undefined) => n?.label ?? '?'
 
+/** An identity's name with its kind, so "alice" the user and "alice" the entity read differently. */
+function Who({ node }: { node: GraphNode | undefined }) {
+  return (
+    <>
+      <span>{label(node)}</span>
+      {node?.type === 'identity' && <span className="tag">{node.kind}</span>}
+    </>
+  )
+}
+
+function Warnings({ items }: { items: string[] | undefined }) {
+  return items?.map((w) => (
+    <p key={w} className="note-warn">
+      {w}
+    </p>
+  ))
+}
+
 function NodeDetails({ node, full, policies }: { node: GraphNode; full: AccessGraph; policies: PolicyInput[] }) {
   const out = full.edges.filter((e) => e.source === node.id)
   const into = full.edges.filter((e) => e.target === node.id)
-  const caps = (e: GraphEdge) => (e.capabilities?.length ? ` (${e.capabilities.join(', ')})` : '')
 
   if (node.type === 'identity') {
     return (
       <>
-        <h2>{node.label}</h2>
-        <p>{node.kind}</p>
+        <header className="detail-head">
+          <h2>{node.label}</h2>
+          <span className="tag">{node.kind}</span>
+        </header>
         <h3>Policies</h3>
-        <ul>{out.map((e) => <li key={e.id}>{label(nodeById(full, e.target))}</li>)}</ul>
-      </>
-    )
-  }
-  if (node.type === 'policy') {
-    const hcl = policies.find((p) => p.name === node.label)?.hcl
-    return (
-      <>
-        <h2>{node.label}</h2>
-        <p>
-          {node.missing ? 'Attached but does not exist.' : node.managed ? 'Managed by EnvBao.' : 'Not managed by EnvBao (read-only).'}
-        </p>
-        {node.warnings.length > 0 && (
-          <ul>
-            {node.warnings.map((w) => (
-              <li key={w}>⚠ {w}</li>
+        {out.length ? (
+          <ul className="rows">
+            {out.map((e) => (
+              <li key={e.id}>
+                <code>{label(nodeById(full, e.target))}</code>
+              </li>
             ))}
           </ul>
+        ) : (
+          <p className="hint">No policies attached.</p>
         )}
-        <h3>Used by</h3>
-        <ul>{into.map((e) => <li key={e.id}>{label(nodeById(full, e.source))}</li>)}</ul>
-        <h3>Grants</h3>
-        <ul>
-          {out.map((e) => (
-            <li key={e.id}>
-              <code>{label(nodeById(full, e.target))}</code>
-              {caps(e)}
-            </li>
-          ))}
-        </ul>
-        {hcl && <pre>{hcl}</pre>}
       </>
     )
   }
+
+  if (node.type === 'policy') {
+    const hcl = policies.find((p) => p.name === node.label)?.hcl
+    const status = node.missing ? 'Attached but does not exist' : node.managed ? 'Managed by EnvBao' : 'Not managed by EnvBao (read-only)'
+    return (
+      <>
+        <header className="detail-head">
+          <h2>{node.label}</h2>
+        </header>
+        <p className="hint">{status}.</p>
+        <Warnings items={node.warnings} />
+        <h3>Used by</h3>
+        {into.length ? (
+          <ul className="rows">
+            {into.map((e) => (
+              <li key={e.id}>
+                <Who node={nodeById(full, e.source)} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="hint">Not attached to anything.</p>
+        )}
+        <h3>Grants</h3>
+        {out.length ? (
+          <ul className="rows">
+            {out.map((e) => (
+              <li key={e.id}>
+                <code>{label(nodeById(full, e.target))}</code>
+                {e.capabilities && <CapabilityChips capabilities={e.capabilities} />}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="hint">No grants.</p>
+        )}
+        {hcl && (
+          <details>
+            <summary>Policy HCL</summary>
+            <pre>{hcl}</pre>
+          </details>
+        )}
+      </>
+    )
+  }
+
   // path: who reaches it, via which policy
   return (
     <>
-      <h2>
-        <code>{node.label}</code>
-      </h2>
+      <header className="detail-head">
+        <h2>
+          <code>{node.label}</code>
+        </h2>
+      </header>
       <h3>Reached through</h3>
-      <ul>
+      <ul className="rows">
         {into.map((e) => {
-          const users = full.edges.filter((x) => x.target === e.source).map((x) => label(nodeById(full, x.source)))
+          const users = full.edges.filter((x) => x.target === e.source).map((x) => nodeById(full, x.source))
           return (
-            <li key={e.id}>
-              {label(nodeById(full, e.source))}
-              {caps(e)}: {users.join(', ') || 'no identity'}
+            <li key={e.id} className="stacked">
+              <div className="row-main">
+                <code>{label(nodeById(full, e.source))}</code>
+                {e.capabilities && <CapabilityChips capabilities={e.capabilities} />}
+              </div>
+              {users.length ? (
+                <ul className="people">
+                  {users.map((u, i) => (
+                    <li key={i}>
+                      <Who node={u} />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="hint">No identity uses this policy.</p>
+              )}
             </li>
           )
         })}
@@ -104,16 +165,27 @@ function EdgeDetails({ client, edge, full, policies, onRevoked }: { client: BaoC
 
   return (
     <>
-      <h2>
-        {label(from)} → {label(to)}
-      </h2>
-      {edge.capabilities && <p>Capabilities: {edge.capabilities.join(', ')}</p>}
-      {edge.warnings?.map((w) => <p key={w}>⚠ {w}</p>)}
+      <header className="detail-head">
+        <h2>
+          <Who node={from} />
+        </h2>
+      </header>
+      <p className="edge-to">
+        <span aria-hidden="true">→</span> <code>{label(to)}</code>
+      </p>
+      {edge.capabilities && (
+        <>
+          <h3>Capabilities</h3>
+          <CapabilityChips capabilities={edge.capabilities} />
+        </>
+      )}
+      <Warnings items={edge.warnings} />
       {isGrant && (
         <>
           {managed?.editable && ownerMatch ? (
             <button
               type="button"
+              className="danger"
               onClick={() =>
                 window.confirm(`Revoke access to ${to!.label} from ${ownerMatch[1]} "${ownerMatch[2]}"? Other policies are unaffected.`) &&
                 revoke.mutate()
@@ -133,7 +205,7 @@ function EdgeDetails({ client, edge, full, policies, onRevoked }: { client: BaoC
 }
 
 export function Details({ client, full, policies, selection, onRevoked }: Props) {
-  let body = <p className="hint">Click a node or an edge for details.</p>
+  let body = <p className="detail-empty">Select a node or a line to see what it grants.</p>
   if (selection?.kind === 'node') {
     const node = nodeById(full, selection.id)
     if (node) body = <NodeDetails node={node} full={full} policies={policies} />

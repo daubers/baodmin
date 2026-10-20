@@ -119,7 +119,9 @@ test('node details show who reaches a path', async () => {
   const user = await open()
   await user.click(screen.getByRole('button', { name: 'node secret/data/app/*' }))
   const d = screen.getByRole('complementary', { name: 'Details' })
-  expect(within(d).getByText(/envbao-user-alice \(read\): alice/)).toBeInTheDocument()
+  expect(within(d).getByText('envbao-user-alice')).toBeInTheDocument()
+  expect(within(d).getByText('read')).toBeInTheDocument()
+  expect(within(d).getByText('alice')).toBeInTheDocument()
 })
 
 test('revokes a grant from a managed policy edge', async () => {

@@ -2,6 +2,7 @@ import type { BaoClient } from '../../api/bao'
 import { dataPath } from '../../api/secrets'
 import { accessForPath } from '../../model/graph'
 import { pathMatches } from '../../model/policy'
+import { CapabilityChips } from '../shared/CapabilityChips'
 import { useAccessInputs } from '../shared/useAccessInputs'
 
 interface Props {
@@ -9,9 +10,6 @@ interface Props {
   mount: string
   secret: string
 }
-
-// Capabilities that let someone change or remove the secret, or bypass policy checks.
-const RISKY = new Set(['delete', 'sudo'])
 
 export function AccessPanel({ client, mount, secret }: Props) {
   const data = useAccessInputs(client)
@@ -60,19 +58,7 @@ function Entries({ data, path }: { data: NonNullable<ReturnType<typeof useAccess
                   <code>{e.policy}</code>
                 </td>
                 <td>
-                  {e.policy === 'root' ? (
-                    <ul className="chips">
-                      <li className="risky">full access</li>
-                    </ul>
-                  ) : (
-                    <ul className="chips">
-                      {e.capabilities.map((c) => (
-                        <li key={c} className={RISKY.has(c) ? 'risky' : undefined}>
-                          {c}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <CapabilityChips capabilities={e.capabilities} />
                 </td>
               </tr>
             ))}

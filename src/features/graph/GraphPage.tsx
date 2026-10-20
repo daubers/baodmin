@@ -17,13 +17,25 @@ import { layoutColumns } from '../../model/layout'
 import { RequireConnection } from '../shared/RequireConnection'
 import { useAccessInputs } from '../shared/useAccessInputs'
 import { Details, type Selection } from './Details'
+import { GraphNodeCard } from './GraphNode'
+
+// Defined once, outside the component, so React Flow doesn't re-register node types on every render.
+const nodeTypes = { gnode: GraphNodeCard }
+
+// A grant with everything is easier to read as one word than as seven.
+const FULL = ['create', 'read', 'update', 'delete', 'list', 'sudo']
+function capabilityLabel(caps: string[] | undefined): string | undefined {
+  if (!caps?.length) return undefined
+  return FULL.every((c) => caps.includes(c)) ? 'full access' : caps.join(', ')
+}
 
 function toFlow(graph: AccessGraph, selected: Selection | null): { nodes: Node[]; edges: Edge[] } {
   const pos = layoutColumns(graph)
   const nodes: Node[] = graph.nodes.map((n) => ({
     id: n.id,
     position: pos.get(n.id)!,
-    data: { label: n.label },
+    type: 'gnode',
+    data: { label: n.label, kind: n.type === 'identity' ? n.kind : undefined },
     className: [
       'gnode',
       `gnode-${n.type}`,
@@ -38,7 +50,10 @@ function toFlow(graph: AccessGraph, selected: Selection | null): { nodes: Node[]
     id: e.id,
     source: e.source,
     target: e.target,
-    label: e.capabilities?.join(', '),
+    label: capabilityLabel(e.capabilities),
+    labelStyle: { fill: 'var(--ink-soft)', fontSize: 12 },
+    labelBgStyle: { fill: 'var(--surface-sunken)' },
+    labelBgPadding: [6, 3],
     markerEnd: { type: MarkerType.ArrowClosed },
     selected: selected?.kind === 'edge' && selected.id === e.id,
   }))
@@ -69,31 +84,45 @@ function GraphView({ client }: { client: BaoClient }) {
 
   return (
     <>
-      <div className="graph-toolbar">
-        <label>
-          Identity
-          <input value={identity} onChange={(e) => setIdentity(e.target.value)} placeholder="filter identities" />
-        </label>
-        <label>
-          Path
-          <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="filter paths" />
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={hideDefault} onChange={(e) => setHideDefault(e.target.checked)} /> Hide the default policy
-        </label>
-        <button type="button" onClick={() => qc.invalidateQueries({ queryKey: ['access-inputs'] })} disabled={inputs.isFetching}>
-          {inputs.isFetching ? 'Refreshing…' : 'Refresh'}
-        </button>
+      <div className="graph-bar">
+        <div className="graph-toolbar">
+          <label>
+            Identity
+            <input value={identity} onChange={(e) => setIdentity(e.target.value)} placeholder="Filter identities" />
+          </label>
+          <label>
+            Path
+            <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="Filter paths" />
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={hideDefault} onChange={(e) => setHideDefault(e.target.checked)} /> Hide the default policy
+          </label>
+          <button type="button" onClick={() => qc.invalidateQueries({ queryKey: ['access-inputs'] })} disabled={inputs.isFetching}>
+            {inputs.isFetching ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+        <ul className="graph-legend" aria-label="Key">
+          <li>
+            <span className="swatch swatch-identity" /> Identity
+          </li>
+          <li>
+            <span className="swatch swatch-policy" /> Policy
+          </li>
+          <li>
+            <span className="swatch swatch-path" /> Path
+          </li>
+          <li>
+            <strong>Bold</strong> policy: managed by EnvBao
+          </li>
+          <li>Dashed: policy is attached but missing</li>
+          <li className="grow">Identities include policies inherited through entities and groups.</li>
+        </ul>
       </div>
       {inputs.data.notes.map((n) => (
         <p key={n} role="alert">
           Incomplete: could not read {n}
         </p>
       ))}
-      <div className="graph-legend" aria-hidden="true">
-        <span>Identities → Policies → Paths</span>
-        <span>Identity→policy edges include policies inherited via entities and groups.</span>
-      </div>
       {shown.nodes.length === 0 ? (
         <p>Nothing matches.</p>
       ) : (
@@ -102,6 +131,7 @@ function GraphView({ client }: { client: BaoClient }) {
             <ReactFlow
               nodes={flow.nodes}
               edges={flow.edges}
+              nodeTypes={nodeTypes}
               fitView
               nodesDraggable={false}
               nodesConnectable={false}
