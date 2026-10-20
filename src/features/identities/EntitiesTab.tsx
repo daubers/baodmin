@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { addAlias, deleteAlias, deleteEntity, listEntities, saveEntity, userpassAccessor, type Entity } from '../../api/identities'
+import { AccessEditor } from '../access/AccessEditor'
 import { PolicyPicker } from '../shared/PolicyPicker'
 
 interface Draft {
@@ -15,6 +16,7 @@ export function EntitiesTab({ client }: { client: BaoClient }) {
   const qc = useQueryClient()
   const entities = useQuery({ queryKey: ['entities'], queryFn: () => listEntities(client) })
   const [draft, setDraft] = useState<Draft | null>(null)
+  const [accessFor, setAccessFor] = useState<string | null>(null)
   const [aliasName, setAliasName] = useState('')
   const refresh = () => qc.invalidateQueries({ queryKey: ['entities'] })
 
@@ -70,6 +72,9 @@ export function EntitiesTab({ client }: { client: BaoClient }) {
               <td>{e.aliases.map((a) => a.name).join(', ') || '—'}</td>
               <td>{e.policies.join(', ') || '—'}</td>
               <td>
+                <button type="button" onClick={() => setAccessFor(e.name)}>
+                  Access
+                </button>{' '}
                 <button type="button" onClick={() => setDraft({ name: e.name, policies: e.policies, isNew: false, entity: e })}>
                   Edit
                 </button>{' '}
@@ -133,6 +138,7 @@ export function EntitiesTab({ client }: { client: BaoClient }) {
           )}
         </form>
       )}
+      {accessFor && <AccessEditor key={accessFor} client={client} target={{ kind: 'entity', name: accessFor }} onClose={() => setAccessFor(null)} />}
     </section>
   )
 }

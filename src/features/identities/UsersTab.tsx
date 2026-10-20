@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { deleteUser, listUsers, saveUser } from '../../api/identities'
+import { AccessEditor } from '../access/AccessEditor'
 import { PolicyPicker } from '../shared/PolicyPicker'
 
 interface Draft {
@@ -18,6 +19,7 @@ export function UsersTab({ client }: { client: BaoClient }) {
   const qc = useQueryClient()
   const users = useQuery({ queryKey: ['users'], queryFn: () => listUsers(client) })
   const [draft, setDraft] = useState<Draft | null>(null)
+  const [accessFor, setAccessFor] = useState<string | null>(null)
 
   const save = useMutation({
     mutationFn: (d: Draft) => saveUser(client, { name: d.name, password: d.password, policies: d.policies, ttl: d.ttl }),
@@ -53,6 +55,9 @@ export function UsersTab({ client }: { client: BaoClient }) {
               <td>{u.name}</td>
               <td>{u.policies.join(', ') || '—'}</td>
               <td>
+                <button type="button" onClick={() => setAccessFor(u.name)}>
+                  Access
+                </button>{' '}
                 <button type="button" onClick={() => setDraft({ ...u, password: '', ttl: u.ttl ? `${u.ttl}s` : '', isNew: false })}>
                   Edit
                 </button>{' '}
@@ -106,6 +111,7 @@ export function UsersTab({ client }: { client: BaoClient }) {
           </div>
         </form>
       )}
+      {accessFor && <AccessEditor key={accessFor} client={client} target={{ kind: 'user', name: accessFor }} onClose={() => setAccessFor(null)} />}
     </section>
   )
 }

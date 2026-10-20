@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { deleteGroup, listEntities, listGroups, saveGroup } from '../../api/identities'
+import { AccessEditor } from '../access/AccessEditor'
 import { PolicyPicker } from '../shared/PolicyPicker'
 
 interface Draft {
@@ -16,6 +17,7 @@ export function GroupsTab({ client }: { client: BaoClient }) {
   const groups = useQuery({ queryKey: ['groups'], queryFn: () => listGroups(client) })
   const entities = useQuery({ queryKey: ['entities'], queryFn: () => listEntities(client) })
   const [draft, setDraft] = useState<Draft | null>(null)
+  const [accessFor, setAccessFor] = useState<string | null>(null)
   const refresh = () => qc.invalidateQueries({ queryKey: ['groups'] })
 
   const nameOf = (id: string) => entities.data?.find((e) => e.id === id)?.name ?? id
@@ -53,6 +55,9 @@ export function GroupsTab({ client }: { client: BaoClient }) {
               <td>{g.member_entity_ids.map(nameOf).join(', ') || '—'}</td>
               <td>{g.policies.join(', ') || '—'}</td>
               <td>
+                <button type="button" onClick={() => setAccessFor(g.name)}>
+                  Access
+                </button>{' '}
                 <button
                   type="button"
                   onClick={() => setDraft({ name: g.name, policies: g.policies, members: g.member_entity_ids, isNew: false })}
@@ -107,6 +112,7 @@ export function GroupsTab({ client }: { client: BaoClient }) {
           </div>
         </form>
       )}
+      {accessFor && <AccessEditor key={accessFor} client={client} target={{ kind: 'group', name: accessFor }} onClose={() => setAccessFor(null)} />}
     </section>
   )
 }

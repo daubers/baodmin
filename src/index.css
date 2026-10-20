@@ -103,3 +103,15 @@ label.check {
   opacity: 0.7;
   font-size: 0.9em;
 }
+
+.access-editor {
+  border-top: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+}
+
+pre {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  padding: 0.75rem;
+  overflow-x: auto;
+}

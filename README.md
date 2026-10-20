@@ -135,6 +135,9 @@ CI runs on Gitea Actions (`.gitea/workflows/`): lint, test, build.
 - No server-side audit trail beyond OpenBao's own audit log.
 - KV v2 only.
 - Only userpass auth, tokens and identity entities/groups are supported.
-- Policies not created by the UI (not named `envbao-*`) are shown read-only in the graph.
+- Access is granted by writing one managed policy per user, entity or group, named `envbao-<kind>-<name>` (for example `envbao-user-alice`). A managed policy that is edited outside EnvBao becomes read-only in the UI. Other policies are always shown read-only.
+- Tokens cannot be granted access after creation (OpenBao fixes a token's policies when it is created), so choose their policies when creating them.
+- Grants are KV v2 only: they write `<mount>/data/...` rules for read/create/update/delete and `<mount>/metadata/...` for list.
+- The access model follows OpenBao's "most specific path wins" rule, so a broader rule never adds to or overrides a more specific one.
 - Glob and templated policy paths are approximated.
 - The graph is not paginated, so large instances may be slow.
