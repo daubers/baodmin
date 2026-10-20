@@ -28,50 +28,62 @@ function Browser({ client }: { client: BaoClient }) {
   if (mounts.isPending) return <p>Loading…</p>
   if (!mount) return <p>No KV v2 secrets engines are mounted.</p>
 
+  const where = prefix ? `${mount}${prefix}` : mount
+
   return (
-    <>
-      <label>
-        Mount
-        <select
-          value={mount}
-          onChange={(e) => {
-            setMount(e.target.value)
-            go('')
-          }}
-        >
-          {mounts.data.map((m) => (
-            <option key={m.path}>{m.path}</option>
-          ))}
-        </select>
-      </label>
-      <nav aria-label="Path" className="crumbs">
-        <button type="button" onClick={() => go('')}>
-          {mount}
-        </button>
-        {crumbs.map((c, i) => (
-          <button key={i} type="button" onClick={() => go(crumbs.slice(0, i + 1).join('/') + '/')}>
-            {c}/
-          </button>
-        ))}
-      </nav>
-      {entries.error && <p role="alert">{entries.error.message}</p>}
-      {entries.data?.length === 0 && <p>Nothing here.</p>}
-      <ul className="entries">
-        {entries.data?.map((e) => (
-          <li key={e.path}>
-            <button
-              type="button"
-              aria-pressed={selected === e.path}
-              onClick={() => (e.isFolder ? go(e.path) : setSelected(e.path))}
+    <div className="secrets-layout">
+      <div className="secrets-browser">
+        <nav aria-label="Path" className="crumbs">
+          {mounts.data.length > 1 && (
+            <select
+              aria-label="Mount"
+              value={mount}
+              onChange={(e) => {
+                setMount(e.target.value)
+                go('')
+              }}
             >
-              {e.isFolder ? '📁 ' : '🔑 '}
-              {e.name}
+              {mounts.data.map((m) => (
+                <option key={m.path}>{m.path}</option>
+              ))}
+            </select>
+          )}
+          <button type="button" onClick={() => go('')}>
+            {mount}
+          </button>
+          {crumbs.map((c, i) => (
+            <button key={i} type="button" onClick={() => go(crumbs.slice(0, i + 1).join('/') + '/')}>
+              {c}/
             </button>
-          </li>
-        ))}
-      </ul>
-      {selected && <AccessPanel client={client} mount={mount} secret={selected} />}
-    </>
+          ))}
+        </nav>
+        {entries.isPending && <p className="hint">Loading…</p>}
+        {entries.error && <p role="alert">{entries.error.message}</p>}
+        {entries.data?.length === 0 && <p className="hint">No secrets in {where} yet.</p>}
+        {!!entries.data?.length && (
+          <ul className="entries" aria-label={`Contents of ${where}`}>
+            {entries.data.map((e) => (
+              <li key={e.path}>
+                <button
+                  type="button"
+                  className={e.isFolder ? 'entry-folder' : undefined}
+                  aria-pressed={e.isFolder ? undefined : selected === e.path}
+                  onClick={() => (e.isFolder ? go(e.path) : setSelected(e.path))}
+                >
+                  {e.name}
+                  {e.isFolder && <span aria-hidden="true">›</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {selected ? (
+        <AccessPanel client={client} mount={mount} secret={selected} />
+      ) : (
+        <p className="secret-placeholder">Select a secret to see who can reach it.</p>
+      )}
+    </div>
   )
 }
 

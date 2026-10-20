@@ -870,3 +870,84 @@ button.link:hover:not(:disabled) {
   background: none;
   filter: brightness(1.15);
 }
+
+/* ---------- Secrets page ---------- */
+
+.secrets-layout {
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+  gap: var(--s5);
+  align-items: start;
+}
+
+.secrets-browser .crumbs {
+  margin-top: 0;
+}
+
+.secrets-browser .crumbs select {
+  min-width: 0;
+}
+
+.secrets-browser .entries {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.secret-detail {
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.secret-detail header {
+  display: grid;
+  gap: var(--s1);
+  margin-bottom: var(--s4);
+}
+
+.secret-detail h2 {
+  margin: 0;
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.secret-detail header code {
+  color: var(--ink-faint);
+  overflow-wrap: anywhere;
+}
+
+.secret-detail table {
+  margin-bottom: var(--s3);
+}
+
+.secret-placeholder {
+  margin: 0;
+  padding: var(--s6) var(--s5);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.tag {
+  padding: 0 var(--s2);
+  margin-left: var(--s1);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+/* Capabilities that change or remove data, or bypass policy checks. */
+.chips li.risky {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+@media (max-width: 60rem) {
+  .secrets-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

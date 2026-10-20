@@ -66,7 +66,8 @@ test('navigates folders and shows who can reach a secret', async () => {
   const panel = await screen.findByRole('region', { name: 'Access' })
   const row = (await within(panel).findByText('alice')).closest('tr')!
   expect(within(row).getByText('app-rw')).toBeInTheDocument()
-  expect(within(row).getByText('read, update')).toBeInTheDocument()
+  expect(within(row).getByText('read')).toBeInTheDocument()
+  expect(within(row).getByText('update')).toBeInTheDocument()
   expect(within(panel).queryByText('bob')).not.toBeInTheDocument()
   expect(within(panel).getByText('secret/data/app/db')).toBeInTheDocument()
 })
