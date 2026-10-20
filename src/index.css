@@ -1106,9 +1106,18 @@ button.link:hover:not(:disabled) {
 }
 
 .secret-detail header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s2) var(--s4);
+  margin-bottom: var(--s4);
+}
+
+.secret-detail header > div {
   display: grid;
   gap: var(--s1);
-  margin-bottom: var(--s4);
+  min-width: 0;
 }
 
 .secret-detail h2 {
@@ -1420,5 +1429,27 @@ button.danger-solid:hover:not(:disabled) {
 
 .edge-label-selected {
   border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Inline "Grant access" form inside the secret detail card. */
+.grant-here {
+  max-width: none;
+  margin: 0 0 var(--s4);
+  background: var(--bg);
+}
+
+.caps {
+  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+}
+
+.caps legend {
+  grid-column: 1 / -1;
+}
+
+.note-ok {
+  padding: var(--s2) var(--s3);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
   color: var(--accent);
 }

@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { dataPath } from '../../api/secrets'
 import { accessForPath } from '../../model/graph'
 import { pathMatches } from '../../model/policy'
 import { CapabilityChips } from '../shared/CapabilityChips'
 import { useAccessInputs } from '../shared/useAccessInputs'
+import { GrantHere } from './GrantHere'
 
 interface Props {
   client: BaoClient
@@ -14,13 +16,47 @@ interface Props {
 export function AccessPanel({ client, mount, secret }: Props) {
   const data = useAccessInputs(client)
   const path = dataPath(mount, secret)
+  const [granting, setGranting] = useState(false)
+  const [granted, setGranted] = useState<string | null>(null)
 
   return (
     <section aria-label="Access" className="secret-detail">
       <header>
-        <h2>{secret}</h2>
-        <code>{path}</code>
+        <div>
+          <h2>{secret}</h2>
+          <code>{path}</code>
+        </div>
+        {!granting && (
+          <button
+            type="button"
+            disabled={!data.data}
+            onClick={() => {
+              setGranted(null)
+              setGranting(true)
+            }}
+          >
+            Grant access
+          </button>
+        )}
       </header>
+      {granted && (
+        <p role="status" className="note-ok">
+          {granted}
+        </p>
+      )}
+      {granting && data.data && (
+        <GrantHere
+          client={client}
+          mount={mount}
+          secret={secret}
+          identities={data.data.identities}
+          onClose={() => setGranting(false)}
+          onGranted={(message) => {
+            setGranting(false)
+            setGranted(message)
+          }}
+        />
+      )}
       {data.isPending && <p className="hint">Loading access…</p>}
       {data.error && <p role="alert">Could not load access: {data.error.message}</p>}
       {data.data && <Entries data={data.data} path={path} />}

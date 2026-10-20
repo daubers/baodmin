@@ -79,7 +79,7 @@ function Browser({ client }: { client: BaoClient }) {
         )}
       </div>
       {selected ? (
-        <AccessPanel client={client} mount={mount} secret={selected} />
+        <AccessPanel key={`${mount}${selected}`} client={client} mount={mount} secret={selected} />
       ) : (
         <p className="secret-placeholder">Select a secret to see who can reach it.</p>
       )}

@@ -1,11 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { getGrantState, grantAccess, revokeAccess, type Target } from '../../api/grants'
 import { listKvMounts, readPolicyHcl } from '../../api/secrets'
-import { KV_CAPABILITIES, kvGrantRules, validateGrantPath, type KvCapability } from '../../model/managed'
+import { kvGrantRules, validateGrantPath, type KvCapability } from '../../model/managed'
 import { groupGrants } from '../../model/grantRows'
 import { CapabilityChips } from '../shared/CapabilityChips'
+import { CapabilityPicker } from '../shared/CapabilityPicker'
+import { useRefreshAccess } from '../shared/useRefreshAccess'
 import { PathPicker } from './PathPicker'
 import { useConfirm } from '../shared/useConfirm'
 
@@ -30,7 +32,6 @@ function PolicyView({ client, name }: { client: BaoClient; name: string }) {
 }
 
 export function AccessEditor({ client, target, onClose }: Props) {
-  const qc = useQueryClient()
   const confirm = useConfirm()
   const stateKey = ['grant-state', target.kind, target.name]
   const state = useQuery({ queryKey: stateKey, queryFn: () => getGrantState(client, target) })
@@ -43,12 +44,7 @@ export function AccessEditor({ client, target, onClose }: Props) {
   const [formError, setFormError] = useState<string | null>(null)
   const mount = mountChoice ?? mounts.data?.[0]?.path ?? ''
 
-  const done = () =>
-    Promise.all(
-      [stateKey, ['users'], ['entities'], ['groups'], ['access-inputs'], ['policies']].map((queryKey) =>
-        qc.invalidateQueries({ queryKey }),
-      ),
-    )
+  const done = useRefreshAccess()
 
   const grant = useMutation({
     mutationFn: () => grantAccess(client, target, kvGrantRules(mount, secretPath, caps)),
@@ -163,6 +159,7 @@ export function AccessEditor({ client, target, onClose }: Props) {
                 Secrets engine
                 <select
                   value={mount}
+                  onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
                   onChange={(e) => {
                     setMount(e.target.value)
                     setSecretPath('')
@@ -174,19 +171,7 @@ export function AccessEditor({ client, target, onClose }: Props) {
                 </select>
               </label>
               {mount && <PathPicker key={mount} client={client} mount={mount} value={secretPath} onChange={setSecretPath} />}
-              <fieldset className="caps">
-                <legend>Capabilities</legend>
-                {KV_CAPABILITIES.map((c) => (
-                  <label key={c} className="check">
-                    <input
-                      type="checkbox"
-                      checked={caps.includes(c)}
-                      onChange={(e) => setCaps(e.target.checked ? [...caps, c] : caps.filter((x) => x !== c))}
-                    />{' '}
-                    {c}
-                  </label>
-                ))}
-              </fieldset>
+              <CapabilityPicker value={caps} onChange={setCaps} />
               <p className="hint">
                 Granting a path that already has a grant replaces its capabilities. “list” applies to the secret’s metadata path.
               </p>
