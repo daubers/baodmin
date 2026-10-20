@@ -15,7 +15,8 @@ services:
       interval: 2s
       retries: 15
 
-  # One-shot: allow the UI origin to call OpenBao from the browser.
+  # One-shot: allow the UI origin to call OpenBao from the browser. OpenBao's own
+  # web UI (:8200) is same-origin but still sends an Origin header, so it is listed too.
   openbao-setup:
     image: openbao/openbao:latest
     depends_on:
@@ -24,7 +25,7 @@ services:
     environment:
       BAO_ADDR: http://openbao:8200
       BAO_TOKEN: root
-    entrypoint: ["bao", "write", "sys/config/cors", "enabled=true", "allowed_origins=http://localhost:8080", "allowed_headers=X-Vault-Token,Content-Type"]
+    entrypoint: ["bao", "write", "sys/config/cors", "enabled=true", "allowed_origins=http://localhost:8080,http://localhost:8200", "allowed_headers=X-Vault-Token,Content-Type"]
     restart: "no"
 
   ui:
