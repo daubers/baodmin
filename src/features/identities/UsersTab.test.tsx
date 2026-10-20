@@ -33,6 +33,15 @@ test('lists users', async () => {
   expect(within(row).getByText('dev')).toBeInTheDocument()
 })
 
+test('the user form has a heading that says what it is for', async () => {
+  const user = setup()
+  await user.click(await screen.findByRole('button', { name: 'New user' }))
+  expect(screen.getByRole('heading', { name: 'New user' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Cancel' }))
+  await user.click(await screen.findByRole('button', { name: 'Edit alice' }))
+  expect(screen.getByRole('heading', { name: 'Edit alice' })).toBeInTheDocument()
+})
+
 test('creates a user with selected policies', async () => {
   const user = setup()
   await user.click(await screen.findByRole('button', { name: 'New user' }))

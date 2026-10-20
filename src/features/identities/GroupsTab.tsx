@@ -57,10 +57,10 @@ export function GroupsTab({ client }: { client: BaoClient }) {
           {groups.data?.map((g) => (
             <tr key={g.id}>
               <td>{g.name}</td>
-              <td>
+              <td data-label="Members">
                 <NameChips names={g.member_entity_ids.map(nameOf)} />
               </td>
-              <td>
+              <td data-label="Policies">
                 <PolicyChips policies={g.policies} />
               </td>
               <td>
@@ -92,7 +92,8 @@ export function GroupsTab({ client }: { client: BaoClient }) {
         </button>
       )}
       {draft && (
-        <form onSubmit={submit} aria-label={draft.isNew ? 'New group' : `Edit ${draft.name}`}>
+        <form onSubmit={submit} aria-label={draft.isNew ? 'New group' : `Edit ${draft.name}`} className="wide">
+          <h3>{draft.isNew ? 'New group' : `Edit ${draft.name}`}</h3>
           <label>
             Name
             <input value={draft.name} disabled={!draft.isNew} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />

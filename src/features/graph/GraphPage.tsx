@@ -9,13 +9,14 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { buildAccessGraph, type AccessGraph } from '../../model/graph'
 import { filterGraph } from '../../model/graphFilter'
 import { layoutColumns } from '../../model/layout'
 import { RequireConnection } from '../shared/RequireConnection'
 import { useAccessInputs } from '../shared/useAccessInputs'
+import { useNarrow } from '../shared/useNarrow'
 import { Details, type Selection } from './Details'
 import { GrantEdge, type GrantEdgeData } from './GraphEdge'
 import { GraphNodeCard } from './GraphNode'
@@ -79,6 +80,13 @@ function GraphView({ client }: { client: BaoClient }) {
   const [path, setPath] = useState('')
   const [hideDefault, setHideDefault] = useState(true)
   const [selected, setSelected] = useState<Selection | null>(null)
+  const narrow = useNarrow()
+  const detailsRef = useRef<HTMLElement>(null)
+
+  // On a phone the details sit below the canvas, so bring them into view when something is picked.
+  useEffect(() => {
+    if (narrow && selected) detailsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }, [narrow, selected])
 
   const full = useMemo(
     () => (inputs.data ? buildAccessGraph(inputs.data.identities, inputs.data.policies) : null),
@@ -131,6 +139,7 @@ function GraphView({ client }: { client: BaoClient }) {
           </li>
           <li>Dashed: policy is attached but missing</li>
           <li className="grow">Identities include policies inherited through entities and groups.</li>
+          <li className="graph-hint">Drag to pan, pinch to zoom, tap a node or label for details.</li>
         </ul>
       </div>
       {inputs.data.notes.map((n) => (
@@ -144,11 +153,15 @@ function GraphView({ client }: { client: BaoClient }) {
         <div className="graph-layout">
           <div className="graph-canvas" data-testid="graph-canvas">
             <ReactFlow
+              // A phone can't fit the whole graph at a readable size: open at a fixed zoom and let people pan.
+              key={narrow ? 'narrow' : 'wide'}
               nodes={flow.nodes}
               edges={flow.edges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
-              fitView
+              fitView={!narrow}
+              defaultViewport={narrow ? { x: 16, y: 16, zoom: 0.8 } : undefined}
+              minZoom={narrow ? 0.3 : undefined}
               nodesDraggable={false}
               nodesConnectable={false}
               elementsSelectable
@@ -161,7 +174,7 @@ function GraphView({ client }: { client: BaoClient }) {
               <Controls showInteractive={false} />
             </ReactFlow>
           </div>
-          <Details client={client} full={full} policies={inputs.data.policies} selection={selected} onRevoked={() => setSelected(null)} />
+          <Details ref={detailsRef} client={client} full={full} policies={inputs.data.policies} selection={selected} onRevoked={() => setSelected(null)} />
         </div>
       )}
     </>

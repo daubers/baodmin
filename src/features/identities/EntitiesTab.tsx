@@ -74,10 +74,10 @@ export function EntitiesTab({ client }: { client: BaoClient }) {
           {entities.data?.map((e) => (
             <tr key={e.id}>
               <td>{e.name}</td>
-              <td>
+              <td data-label="Aliases">
                 <NameChips names={e.aliases.map((a) => a.name)} />
               </td>
-              <td>
+              <td data-label="Policies">
                 <PolicyChips policies={e.policies} />
               </td>
               <td>
@@ -110,7 +110,8 @@ export function EntitiesTab({ client }: { client: BaoClient }) {
         </button>
       )}
       {draft && (
-        <form onSubmit={submit} aria-label={draft.isNew ? 'New entity' : `Edit ${draft.name}`}>
+        <form onSubmit={submit} aria-label={draft.isNew ? 'New entity' : `Edit ${draft.name}`} className="wide">
+          <h3>{draft.isNew ? 'New entity' : `Edit ${draft.name}`}</h3>
           <label>
             Name
             <input value={draft.name} disabled={!draft.isNew} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />

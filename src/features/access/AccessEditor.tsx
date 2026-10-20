@@ -114,7 +114,7 @@ export function AccessEditor({ client, target, onClose }: Props) {
                         <code>{row.display}</code>
                         {row.wildcard && <span className="tag">everything inside</span>}
                       </td>
-                      <td>
+                      <td data-label="Can">
                         <CapabilityChips capabilities={row.capabilities} />
                       </td>
                       <td>

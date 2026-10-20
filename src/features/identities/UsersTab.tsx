@@ -58,7 +58,7 @@ export function UsersTab({ client }: { client: BaoClient }) {
           {users.data?.map((u) => (
             <tr key={u.name}>
               <td>{u.name}</td>
-              <td>
+              <td data-label="Policies">
                 <PolicyChips policies={u.policies} />
               </td>
               <td>
@@ -90,7 +90,8 @@ export function UsersTab({ client }: { client: BaoClient }) {
         </button>
       )}
       {draft && (
-        <form onSubmit={submit} aria-label={draft.isNew ? 'New user' : `Edit ${draft.name}`}>
+        <form onSubmit={submit} aria-label={draft.isNew ? 'New user' : `Edit ${draft.name}`} className="wide">
+          <h3>{draft.isNew ? 'New user' : `Edit ${draft.name}`}</h3>
           <label>
             Username
             <input value={draft.name} disabled={!draft.isNew} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />

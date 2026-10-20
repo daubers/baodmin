@@ -54,10 +54,10 @@ function Entries({ data, path }: { data: NonNullable<ReturnType<typeof useAccess
                 <td>
                   <span>{e.identity.name}</span> <span className="tag">{e.identity.kind}</span>
                 </td>
-                <td>
+                <td data-label="Via policy">
                   <code>{e.policy}</code>
                 </td>
-                <td>
+                <td data-label="Can">
                   <CapabilityChips capabilities={e.capabilities} />
                 </td>
               </tr>

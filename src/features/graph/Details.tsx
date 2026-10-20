@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import type { Ref } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { revokeAccess } from '../../api/grants'
 import type { AccessGraph, GraphEdge, GraphNode, PolicyInput } from '../../model/graph'
@@ -14,6 +15,7 @@ interface Props {
   policies: PolicyInput[]
   selection: Selection | null
   onRevoked: () => void
+  ref?: Ref<HTMLElement>
 }
 
 const nodeById = (g: AccessGraph, id: string) => g.nodes.find((n) => n.id === id)
@@ -210,7 +212,7 @@ function EdgeDetails({ client, edge, full, policies, onRevoked }: { client: BaoC
   )
 }
 
-export function Details({ client, full, policies, selection, onRevoked }: Props) {
+export function Details({ client, full, policies, selection, onRevoked, ref }: Props) {
   let body = <p className="detail-empty">Select a node or a line to see what it grants.</p>
   if (selection?.kind === 'node') {
     const node = nodeById(full, selection.id)
@@ -220,7 +222,7 @@ export function Details({ client, full, policies, selection, onRevoked }: Props)
     if (edge) body = <EdgeDetails client={client} edge={edge} full={full} policies={policies} onRevoked={onRevoked} />
   }
   return (
-    <aside className="graph-details" aria-label="Details">
+    <aside ref={ref} className="graph-details" aria-label="Details">
       {body}
     </aside>
   )

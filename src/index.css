@@ -998,6 +998,7 @@ dd {
 }
 
 .chips li {
+  white-space: nowrap;
   padding: 0 var(--s2);
   background: var(--accent-soft);
   color: var(--accent);
@@ -1230,15 +1231,99 @@ button.primary:hover:not(:disabled) {
   }
 }
 
+.graph-hint {
+  display: none;
+}
+
 @media (max-width: 40rem) {
-  /* Wide tables scroll sideways inside themselves rather than widening the page. */
-  table {
+  /*
+   * Tables become stacked cards: the first cell is the title, other cells show their column name
+   * (from data-label) above the value, and row actions sit underneath instead of off the edge.
+   */
+  table,
+  tbody,
+  tr,
+  td {
     display: block;
-    overflow-x: auto;
+  }
+
+  table {
+    overflow: visible;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tr {
+    padding: var(--s3) var(--s4);
+    border-bottom: 1px solid var(--line);
+  }
+
+  tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  td {
+    padding: var(--s1) 0;
+    border: 0;
+  }
+
+  td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--ink-faint);
+    font-size: var(--text-sm);
+  }
+
+  td:last-child:has(button) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2);
+    padding-top: var(--s2);
+    text-align: left;
+  }
+
+  td:last-child button + button {
+    margin-left: 0;
+  }
+
+  /* Five nav items have to fit on one line. */
+  .shell > nav {
+    gap: 0;
+    padding: 0 var(--s2);
+  }
+
+  .shell > nav strong {
+    margin-right: var(--s2);
+  }
+
+  .shell > nav a {
+    padding: var(--s3) var(--s2);
+    font-size: var(--text-sm);
   }
 
   .shell > nav .whoami {
     display: none;
+  }
+
+  /* Less nested padding so cards inside cards keep their width. */
+  form,
+  .secret-detail {
+    padding: var(--s4);
+  }
+
+  .access-head {
+    padding: var(--s3) var(--s4);
+  }
+
+  .access-body {
+    padding: var(--s3);
+  }
+
+  .graph-hint {
+    display: list-item;
+    list-style: none;
   }
 
   .graph-toolbar label:not(.check),
@@ -1250,8 +1335,9 @@ button.primary:hover:not(:disabled) {
     margin-left: 0;
   }
 
+  /* The legend is already most of a screen on a phone; drop the long note. */
   .graph-legend .grow {
-    margin-left: 0;
+    display: none;
   }
 
   .access-head,

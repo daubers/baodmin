@@ -104,11 +104,11 @@ export function TokensTab({ client }: { client: BaoClient }) {
                   {t.display_name || '—'}
                   {isSelf ? ' (you)' : ''}
                 </td>
-                <td>
+                <td data-label="Policies">
                   <PolicyChips policies={t.policies} />
                 </td>
-                <td>{formatTtl(t.ttl)}</td>
-                <td>
+                <td data-label="Expires">{formatTtl(t.ttl)}</td>
+                <td data-label="Accessor">
                   <code>{t.accessor.slice(0, 8)}…</code>
                 </td>
                 <td>
