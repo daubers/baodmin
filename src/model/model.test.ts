@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { accessForPath, buildAccessGraph, type Identity } from './graph'
 import { parseHcl } from './hcl'
-import { effectiveCapabilities, parsePolicy, pathMatches } from './policy'
+import { comparePriority, effectiveCapabilities, parsePolicy, pathMatches } from './policy'
 
 describe('parseHcl', () => {
   test('parses comments, blocks and values', () => {
@@ -88,17 +88,51 @@ describe('pathMatches', () => {
   })
 })
 
-describe('effectiveCapabilities', () => {
-  test('unions matching rules and deny wins', () => {
-    const rules = parsePolicy(`
-      path "s/*" { capabilities = ["read", "list"] }
-      path "s/a" { capabilities = ["update"] }
-      path "s/secret" { capabilities = ["deny"] }
-    `).rules
-    expect(effectiveCapabilities(rules, 's/a').sort()).toEqual(['list', 'read', 'update'])
-    expect(effectiveCapabilities(rules, 's/secret')).toEqual(['deny'])
-    expect(effectiveCapabilities(rules, 'other')).toEqual([])
+describe('comparePriority', () => {
+  test.each([
+    // [higher, lower]
+    ['s/exact', 's/*'],
+    ['s/a/*', 's/*'],
+    ['s/a/+', 's/+/b'],
+    ['s/a/b*', 's/a/*'],
+    ['s/+/b', 's/*'],
+    ['s/+/+/c', 's/+/+/*'],
+    ['s/a/+/c', 's/a/+/+'],
+    ['s/a/bb', 's/a/b'],
+    ['s/b', 's/a'],
+  ])('%s outranks %s', (hi, lo) => {
+    expect(comparePriority(hi, lo)).toBeGreaterThan(0)
+    expect(comparePriority(lo, hi)).toBeLessThan(0)
   })
+})
+
+describe('effectiveCapabilities', () => {
+  const rules = parsePolicy(`
+    path "s/*" { capabilities = ["read", "list"] }
+    path "s/a" { capabilities = ["update"] }
+    path "s/secret" { capabilities = ["deny"] }
+    path "s/+/pub" { capabilities = ["read"] }
+  `).rules
+
+  test('the most specific rule wins and rules are not unioned', () => {
+    expect(effectiveCapabilities(rules, 's/a')).toEqual(['update'])
+    expect(effectiveCapabilities(rules, 's/other').sort()).toEqual(['list', 'read'])
+    expect(effectiveCapabilities(rules, 's/x/pub')).toEqual(['read'])
+  })
+
+  test('deny at the winning path wins; a broader deny does not override a specific grant', () => {
+    expect(effectiveCapabilities(rules, 's/secret')).toEqual(['deny'])
+    const r = parsePolicy('path "s/*" { capabilities = ["deny"] }\npath "s/ok" { capabilities = ["read"] }').rules
+    expect(effectiveCapabilities(r, 's/ok')).toEqual(['read'])
+    expect(effectiveCapabilities(r, 's/no')).toEqual(['deny'])
+  })
+
+  test('identical paths from different rules are merged', () => {
+    const r = parsePolicy('path "s/a" { capabilities = ["read"] }\npath "s/a" { capabilities = ["update"] }').rules
+    expect(effectiveCapabilities(r, 's/a').sort()).toEqual(['read', 'update'])
+  })
+
+  test('no match is empty', () => expect(effectiveCapabilities(rules, 'other')).toEqual([]))
 })
 
 describe('buildAccessGraph', () => {
@@ -182,9 +216,28 @@ describe('accessForPath', () => {
     { kind: 'user', name: 'c', policies: ['ro'] },
   ]
 
-  test('lists identities with access, honouring deny', () => {
+  test('the most specific path wins per identity, and deny at that path removes access', () => {
     const res = accessForPath(ids, policies, 'secret/data/app/db', pathMatches)
-    expect(res.map((r) => `${r.identity.name}:${r.policy}`)).toEqual(['a:rw', 'a:ro', 'c:ro'])
+    // a: exact `app/db` (ro) outranks the `app/*` glob (rw), so only read; b: exact deny; c: ro
+    expect(res.map((r) => `${r.identity.name}:${r.policy}:${r.capabilities.join()}`)).toEqual(['a:ro:read', 'c:ro:read'])
+  })
+
+  test('falls back to the glob where no more specific rule matches', () => {
+    const res = accessForPath(ids, policies, 'secret/data/app/other', pathMatches)
+    expect(res.map((r) => `${r.identity.name}:${r.policy}`)).toEqual(['a:rw', 'b:rw'])
+  })
+
+  test('a broader deny does not override a more specific grant', () => {
+    const res = accessForPath(
+      [{ kind: 'user', name: 'd', policies: ['wide-deny', 'narrow'] }],
+      [
+        { name: 'wide-deny', hcl: 'path "s/*" { capabilities = ["deny"] }' },
+        { name: 'narrow', hcl: 'path "s/ok" { capabilities = ["read"] }' },
+      ],
+      's/ok',
+      pathMatches,
+    )
+    expect(res).toHaveLength(1)
   })
 
   test('returns nothing for unrelated paths', () => {

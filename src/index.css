@@ -82,3 +82,24 @@ label.check {
   margin-bottom: 1rem;
   overflow-wrap: anywhere;
 }
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.75rem 0;
+}
+
+.entries {
+  list-style: none;
+  padding: 0;
+}
+
+.entries [aria-pressed='true'] {
+  font-weight: 600;
+}
+
+.hint {
+  opacity: 0.7;
+  font-size: 0.9em;
+}

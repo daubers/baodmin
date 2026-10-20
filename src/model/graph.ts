@@ -1,4 +1,4 @@
-import { CAPABILITIES, parsePolicy, type Capability, type PolicyRule } from './policy'
+import { CAPABILITIES, parsePolicy, winningRules, type Capability, type PolicyRule } from './policy'
 
 export const MANAGED_PREFIX = 'envbao-'
 
@@ -134,7 +134,7 @@ export function buildAccessGraph(identities: Identity[], policies: PolicyInput[]
   return { nodes: [...nodes.values()], edges: [...edges.values()] }
 }
 
-/** Who can reach `secretPath`, and through which policy? Deny wins within a policy set per identity. */
+/** Who can reach `secretPath`, and through which policies? Mirrors OpenBao: one winning path per identity, deny wins. */
 export interface AccessEntry {
   identity: Identity
   policy: string
@@ -145,22 +145,21 @@ export function accessForPath(
   identities: Identity[],
   policies: PolicyInput[],
   secretPath: string,
+  // Kept as a parameter so callers/tests can substitute the matcher.
   match: (rulePath: string, target: string) => boolean,
 ): AccessEntry[] {
   const byName = new Map(policies.map((p) => [p.name, p]))
   const out: AccessEntry[] = []
   for (const identity of identities) {
-    const denied = identity.policies.some((n) => {
-      const p = byName.get(n)
-      return p && rulesFor(p).rules.some((r) => r.capabilities.includes('deny') && match(r.path, secretPath))
+    const tagged = [...new Set(identity.policies)].flatMap((name) => {
+      const p = byName.get(name) ?? (name === 'root' ? { name, hcl: null } : undefined)
+      return p ? rulesFor(p).rules.filter((r) => match(r.path, secretPath)).map((r) => ({ ...r, policy: name })) : []
     })
-    if (denied) continue
-    for (const name of new Set(identity.policies)) {
-      const p = byName.get(name)
-      if (!p) continue
-      const caps = new Set<Capability>()
-      for (const r of rulesFor(p).rules) if (match(r.path, secretPath)) r.capabilities.forEach((c) => caps.add(c))
-      if (caps.size) out.push({ identity, policy: name, capabilities: [...caps] })
+    const winners = winningRules(tagged, secretPath)
+    if (winners.some((r) => r.capabilities.includes('deny'))) continue
+    for (const policy of new Set(winners.map((r) => r.policy))) {
+      const caps = new Set(winners.filter((r) => r.policy === policy).flatMap((r) => r.capabilities))
+      if (caps.size) out.push({ identity, policy, capabilities: [...caps] })
     }
   }
   return out

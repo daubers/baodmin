@@ -107,11 +107,47 @@ function segmentMatches(pattern: string, segment: string): boolean {
   return pattern === segment
 }
 
-/** Effective capabilities of a set of rules on a concrete path; `deny` wins. */
+const normalised = (path: string) => path.replace(/\{\{[^}]*\}\}/g, '+')
+
+/**
+ * OpenBao picks ONE winning path among the rules that match, it does not merge them
+ * (rules with the identical path string, e.g. from different policies, are merged).
+ * Priority, highest first: first wildcard (+ or *) later in the path; non-glob over
+ * trailing-`*` glob; fewer `+` segments; longer path; lexicographically larger.
+ * Returns >0 if `a` outranks `b`.
+ */
+export function comparePriority(a: string, b: string): number {
+  const na = normalised(a)
+  const nb = normalised(b)
+  const wild = (p: string) => {
+    const i = p.search(/[+*]/)
+    return i < 0 ? Infinity : i
+  }
+  if (wild(na) !== wild(nb)) return wild(na) > wild(nb) ? 1 : -1
+  const globA = na.endsWith('*')
+  const globB = nb.endsWith('*')
+  if (globA !== globB) return globA ? -1 : 1
+  const plus = (p: string) => p.split('/').filter((x) => x === '+').length
+  if (plus(na) !== plus(nb)) return plus(na) < plus(nb) ? 1 : -1
+  if (na.length !== nb.length) return na.length > nb.length ? 1 : -1
+  return na === nb ? 0 : na > nb ? 1 : -1
+}
+
+/** The rules at the single winning path for `target` (several when policies repeat that path). */
+export function winningRules<T extends { path: string }>(rules: T[], target: string): T[] {
+  let best: T[] = []
+  for (const r of rules) {
+    if (!pathMatches(r.path, target)) continue
+    const c = best.length ? comparePriority(r.path, best[0].path) : 1
+    if (c > 0) best = [r]
+    else if (c === 0) best.push(r)
+  }
+  return best
+}
+
+/** Effective capabilities on a concrete path; `deny` wins at the winning path. */
 export function effectiveCapabilities(rules: PolicyRule[], target: string): Capability[] {
   const caps = new Set<Capability>()
-  for (const r of rules) {
-    if (pathMatches(r.path, target)) r.capabilities.forEach((c) => caps.add(c))
-  }
+  for (const r of winningRules(rules, target)) r.capabilities.forEach((c) => caps.add(c))
   return caps.has('deny') ? ['deny'] : [...caps]
 }
