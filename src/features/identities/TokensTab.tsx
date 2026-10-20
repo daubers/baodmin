@@ -16,7 +16,8 @@ interface Draft {
   orphan: boolean
 }
 
-const empty: Draft = { displayName: '', policies: [], ttl: '', renewable: true, orphan: false }
+// Least privilege by default: a new token starts with the default policy only.
+const empty: Draft = { displayName: '', policies: ['default'], ttl: '', renewable: true, orphan: false }
 
 function formatTtl(seconds: number): string {
   if (!seconds) return 'no expiry'
@@ -161,12 +162,7 @@ export function TokensTab({ client }: { client: BaoClient }) {
             </span>
           </label>
           <PolicyPicker client={client} value={draft.policies} onChange={(policies) => setDraft({ ...draft, policies })} />
-          {draft.policies.length === 0 && (
-            <p className="note-warn">
-              No policies selected: OpenBao gives the new token the same policies as yours
-              {tokenInfo?.policies.length ? ` (${tokenInfo.policies.join(', ')})` : ''}.
-            </p>
-          )}
+          {draft.policies.length === 0 && <p className="hint">No policies selected: the token gets only the default policy.</p>}
           {create.error && <p role="alert">{create.error.message}</p>}
           <div className="form-actions">
             <button type="submit" disabled={create.isPending}>

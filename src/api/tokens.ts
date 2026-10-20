@@ -39,13 +39,16 @@ export async function listTokens(c: BaoClient): Promise<TokenSummary[]> {
   return found.filter((t): t is TokenSummary => t !== null)
 }
 
+/** What a token gets when no policy is chosen. OpenBao would otherwise copy the creator's policies (root, for root). */
+export const DEFAULT_TOKEN_POLICIES = ['default']
+
 export async function createToken(c: BaoClient, input: CreateTokenInput): Promise<CreatedToken> {
   const res = await c.request<{ auth: { client_token: string; accessor: string; policies: string[] } }>(
     'POST',
     'auth/token/create',
     {
       display_name: input.displayName || undefined,
-      policies: input.policies,
+      policies: input.policies.length ? input.policies : DEFAULT_TOKEN_POLICIES,
       ttl: input.ttl || undefined,
       renewable: input.renewable,
       no_parent: input.orphan || undefined,

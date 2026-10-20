@@ -47,6 +47,20 @@ test('lists tokens with a human TTL', async () => {
   expect(within(row).getByText('2h')).toBeInTheDocument()
 })
 
+test('a new token starts with only the default policy ticked', async () => {
+  setup()
+  await userEvent.setup().click(await screen.findByRole('button', { name: 'New token' }))
+  expect(await screen.findByLabelText('default')).toBeChecked()
+  expect(screen.getByLabelText('dev')).not.toBeChecked()
+})
+
+test('explains what an empty policy selection means', async () => {
+  const user = setup()
+  await user.click(await screen.findByRole('button', { name: 'New token' }))
+  await user.click(await screen.findByLabelText('default'))
+  expect(screen.getByText(/gets only the default policy/)).toBeInTheDocument()
+})
+
 test('creates a token and shows its value once', async () => {
   vi.mocked(api.createToken).mockResolvedValue({ token: 'hvs.SECRET', accessor: 'x', policies: ['dev'] })
   const user = setup()
@@ -58,7 +72,7 @@ test('creates a token and shows its value once', async () => {
 
   expect(api.createToken).toHaveBeenCalledWith(client, {
     displayName: 'ci',
-    policies: ['dev'],
+    policies: ['default', 'dev'],
     ttl: '24h',
     renewable: true,
     orphan: false,
