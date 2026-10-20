@@ -4,6 +4,7 @@ import { revokeAccess } from '../../api/grants'
 import type { AccessGraph, GraphEdge, GraphNode, PolicyInput } from '../../model/graph'
 import { parseManagedPolicy, type GrantTarget } from '../../model/managed'
 import { CapabilityChips } from '../shared/CapabilityChips'
+import { useConfirm } from '../shared/useConfirm'
 
 export type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: string }
 
@@ -147,6 +148,7 @@ function NodeDetails({ node, full, policies }: { node: GraphNode; full: AccessGr
 
 function EdgeDetails({ client, edge, full, policies, onRevoked }: { client: BaoClient; edge: GraphEdge; full: AccessGraph } & Pick<Props, 'policies' | 'onRevoked'>) {
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const from = nodeById(full, edge.source)
   const to = nodeById(full, edge.target)
   const isGrant = from?.type === 'policy' && to?.type === 'path'
@@ -186,10 +188,14 @@ function EdgeDetails({ client, edge, full, policies, onRevoked }: { client: BaoC
             <button
               type="button"
               className="danger"
-              onClick={() =>
-                window.confirm(`Revoke access to ${to!.label} from ${ownerMatch[1]} "${ownerMatch[2]}"? Other policies are unaffected.`) &&
-                revoke.mutate()
-              }
+              onClick={async () => {
+                const ok = await confirm({
+                  title: `Revoke access to ${to!.label}?`,
+                  message: `Removes it from ${ownerMatch[1]} “${ownerMatch[2]}”. Other policies are unaffected.`,
+                  confirmLabel: 'Revoke',
+                })
+                if (ok) revoke.mutate()
+              }}
               disabled={revoke.isPending}
             >
               Revoke

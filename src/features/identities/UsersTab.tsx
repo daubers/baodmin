@@ -5,6 +5,8 @@ import { deleteUser, listUsers, saveUser } from '../../api/identities'
 import { AccessEditor } from '../access/AccessEditor'
 import { ListState } from '../shared/ListState'
 import { PolicyPicker } from '../shared/PolicyPicker'
+import { useConfirm } from '../shared/useConfirm'
+import { PolicyChips } from '../shared/PolicyChips'
 
 interface Draft {
   name: string
@@ -18,6 +20,7 @@ const empty: Draft = { name: '', password: '', policies: [], ttl: '', isNew: tru
 
 export function UsersTab({ client }: { client: BaoClient }) {
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const users = useQuery({ queryKey: ['users'], queryFn: () => listUsers(client) })
   const [draft, setDraft] = useState<Draft | null>(null)
   const [accessFor, setAccessFor] = useState<string | null>(null)
@@ -55,18 +58,22 @@ export function UsersTab({ client }: { client: BaoClient }) {
           {users.data?.map((u) => (
             <tr key={u.name}>
               <td>{u.name}</td>
-              <td>{u.policies.join(', ') || '—'}</td>
+              <td>
+                <PolicyChips policies={u.policies} />
+              </td>
               <td>
                 <button type="button" aria-label={`Access ${u.name}`} onClick={() => setAccessFor(u.name)}>
                   Access
-                </button>{' '}
+                </button>
                 <button type="button" aria-label={`Edit ${u.name}`} onClick={() => setDraft({ ...u, password: '', ttl: u.ttl ? `${u.ttl}s` : '', isNew: false })}>
                   Edit
-                </button>{' '}
+                </button>
                 <button
                   type="button"
                   aria-label={`Delete ${u.name}`}
-                  onClick={() => window.confirm(`Delete user "${u.name}"? This cannot be undone.`) && remove.mutate(u.name)}
+                  onClick={async () => {
+                    if (await confirm({ title: `Delete user “${u.name}”?`, message: 'This cannot be undone.', confirmLabel: 'Delete' })) remove.mutate(u.name)
+                  }}
                 >
                   Delete
                 </button>
@@ -105,10 +112,10 @@ export function UsersTab({ client }: { client: BaoClient }) {
           </label>
           <PolicyPicker client={client} value={draft.policies} onChange={(policies) => setDraft({ ...draft, policies })} />
           {save.error && <p role="alert">{save.error.message}</p>}
-          <div>
+          <div className="form-actions">
             <button type="submit" disabled={save.isPending}>
               Save
-            </button>{' '}
+            </button>
             <button type="button" onClick={() => setDraft(null)}>
               Cancel
             </button>

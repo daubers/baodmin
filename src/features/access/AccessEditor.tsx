@@ -4,7 +4,10 @@ import type { BaoClient } from '../../api/bao'
 import { getGrantState, grantAccess, revokeAccess, type Target } from '../../api/grants'
 import { listKvMounts, readPolicyHcl } from '../../api/secrets'
 import { KV_CAPABILITIES, kvGrantRules, validateGrantPath, type KvCapability } from '../../model/managed'
+import { groupGrants } from '../../model/grantRows'
+import { CapabilityChips } from '../shared/CapabilityChips'
 import { PathPicker } from './PathPicker'
+import { useConfirm } from '../shared/useConfirm'
 
 interface Props {
   client: BaoClient
@@ -28,6 +31,7 @@ function PolicyView({ client, name }: { client: BaoClient; name: string }) {
 
 export function AccessEditor({ client, target, onClose }: Props) {
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const stateKey = ['grant-state', target.kind, target.name]
   const state = useQuery({ queryKey: stateKey, queryFn: () => getGrantState(client, target) })
   const mounts = useQuery({ queryKey: ['kv-mounts'], queryFn: () => listKvMounts(client) })
@@ -53,7 +57,7 @@ export function AccessEditor({ client, target, onClose }: Props) {
       return done()
     },
   })
-  const revoke = useMutation({ mutationFn: (path: string) => revokeAccess(client, target, [path]), onSuccess: done })
+  const revoke = useMutation({ mutationFn: (paths: string[]) => revokeAccess(client, target, paths), onSuccess: done })
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -63,6 +67,7 @@ export function AccessEditor({ client, target, onClose }: Props) {
   }
 
   const s = state.data
+  const rows = groupGrants(s?.managed?.grants ?? [], mounts.data?.map((m) => m.path) ?? [])
   const editable = !s?.managed || s.managed.editable
 
   return (
@@ -93,28 +98,38 @@ export function AccessEditor({ client, target, onClose }: Props) {
               </p>
             )}
             {showRaw && <pre>{s.hcl}</pre>}
-            {s.managed?.grants.length ? (
+            {rows.length ? (
               <table aria-label="Granted by EnvBao">
                 <thead>
                   <tr>
-                    <th>Path</th>
-                    <th>Capabilities</th>
+                    <th>Secret</th>
+                    <th>Can</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {s.managed.grants.map((g) => (
-                    <tr key={g.path}>
+                  {rows.map((row) => (
+                    <tr key={row.display}>
                       <td>
-                        <code>{g.path}</code>
+                        <code>{row.display}</code>
+                        {row.wildcard && <span className="tag">everything inside</span>}
                       </td>
-                      <td>{g.capabilities.join(', ')}</td>
+                      <td>
+                        <CapabilityChips capabilities={row.capabilities} />
+                      </td>
                       <td>
                         <button
                           type="button"
-                          aria-label={`Revoke ${g.path}`}
+                          aria-label={`Revoke ${row.display}`}
                           disabled={!editable}
-                          onClick={() => window.confirm(`Revoke ${g.capabilities.join(', ')} on ${g.path}?`) && revoke.mutate(g.path)}
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: `Revoke access to ${row.display}?`,
+                              message: `Removes ${row.capabilities.join(', ')} from ${target.kind} “${target.name}”.`,
+                              confirmLabel: 'Revoke',
+                            })
+                            if (ok) revoke.mutate(row.paths)
+                          }}
                         >
                           Revoke
                         </button>

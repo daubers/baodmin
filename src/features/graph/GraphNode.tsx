@@ -7,7 +7,7 @@ export function GraphNodeCard({ data }: NodeProps) {
     <div className="gnode-card">
       <Handle type="target" position={Position.Left} isConnectable={false} />
       {kind && <span className="gnode-kind">{kind}</span>}
-      <span className="gnode-label">{label}</span>
+      <span className="gnode-label">{label === '*' ? 'everything (*)' : label}</span>
       <Handle type="source" position={Position.Right} isConnectable={false} />
     </div>
   )

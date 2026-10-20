@@ -53,7 +53,7 @@ function setup() {
 
 test('shows managed grants and read-only other policies', async () => {
   const user = setup()
-  expect(await screen.findByText('secret/data/app/*')).toBeInTheDocument()
+  expect(await screen.findByText('secret/app/*')).toBeInTheDocument()
   const other = screen.getByText('default').closest('li')!
   await user.click(within(other).getByRole('button', { name: 'View default' }))
   expect(await within(other).findByText(/capabilities/)).toBeInTheDocument()
@@ -118,9 +118,9 @@ test('revoke asks for confirmation', async () => {
   vi.mocked(grants.revokeAccess).mockResolvedValue()
   const user = setup()
   const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
-  await user.click(await screen.findByRole('button', { name: 'Revoke secret/data/app/*' }))
+  await user.click(await screen.findByRole('button', { name: 'Revoke secret/app/*' }))
   expect(grants.revokeAccess).not.toHaveBeenCalled()
-  await user.click(screen.getByRole('button', { name: 'Revoke secret/data/app/*' }))
+  await user.click(screen.getByRole('button', { name: 'Revoke secret/app/*' }))
   expect(grants.revokeAccess).toHaveBeenCalledWith(client, target, ['secret/data/app/*'])
   confirm.mockRestore()
 })

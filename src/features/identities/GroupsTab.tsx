@@ -5,6 +5,8 @@ import { deleteGroup, listEntities, listGroups, saveGroup } from '../../api/iden
 import { AccessEditor } from '../access/AccessEditor'
 import { ListState } from '../shared/ListState'
 import { PolicyPicker } from '../shared/PolicyPicker'
+import { useConfirm } from '../shared/useConfirm'
+import { NameChips, PolicyChips } from '../shared/PolicyChips'
 
 interface Draft {
   name: string
@@ -15,6 +17,7 @@ interface Draft {
 
 export function GroupsTab({ client }: { client: BaoClient }) {
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const groups = useQuery({ queryKey: ['groups'], queryFn: () => listGroups(client) })
   const entities = useQuery({ queryKey: ['entities'], queryFn: () => listEntities(client) })
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -54,20 +57,26 @@ export function GroupsTab({ client }: { client: BaoClient }) {
           {groups.data?.map((g) => (
             <tr key={g.id}>
               <td>{g.name}</td>
-              <td>{g.member_entity_ids.map(nameOf).join(', ') || '—'}</td>
-              <td>{g.policies.join(', ') || '—'}</td>
+              <td>
+                <NameChips names={g.member_entity_ids.map(nameOf)} />
+              </td>
+              <td>
+                <PolicyChips policies={g.policies} />
+              </td>
               <td>
                 <button type="button" aria-label={`Access ${g.name}`} onClick={() => setAccessFor(g.name)}>
                   Access
-                </button>{' '}
+                </button>
                 <button
                   type="button"
                   aria-label={`Edit ${g.name}`}
                   onClick={() => setDraft({ name: g.name, policies: g.policies, members: g.member_entity_ids, isNew: false })}
                 >
                   Edit
-                </button>{' '}
-                <button type="button" aria-label={`Delete ${g.name}`} onClick={() => window.confirm(`Delete group "${g.name}"?`) && remove.mutate(g.name)}>
+                </button>
+                <button type="button" aria-label={`Delete ${g.name}`} onClick={async () => {
+                  if (await confirm({ title: `Delete group “${g.name}”?`, message: 'This cannot be undone.', confirmLabel: 'Delete' })) remove.mutate(g.name)
+                }}>
                   Delete
                 </button>
               </td>
@@ -88,7 +97,7 @@ export function GroupsTab({ client }: { client: BaoClient }) {
             Name
             <input value={draft.name} disabled={!draft.isNew} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
           </label>
-          <fieldset>
+          <fieldset className="pick-grid">
             <legend>Member entities</legend>
             {entities.data?.map((e) => (
               <label key={e.id} className="check">
@@ -106,10 +115,10 @@ export function GroupsTab({ client }: { client: BaoClient }) {
           </fieldset>
           <PolicyPicker client={client} value={draft.policies} onChange={(policies) => setDraft({ ...draft, policies })} />
           {save.error && <p role="alert">{save.error.message}</p>}
-          <div>
+          <div className="form-actions">
             <button type="submit" disabled={save.isPending}>
               Save
-            </button>{' '}
+            </button>
             <button type="button" onClick={() => setDraft(null)}>
               Cancel
             </button>

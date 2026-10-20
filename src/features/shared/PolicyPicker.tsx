@@ -13,7 +13,7 @@ export function PolicyPicker({ client, value, onChange }: Props) {
   // Keep policies that are attached but no longer exist selectable, so editing doesn't drop them silently.
   const names = [...new Set([...(data ?? []), ...value])].filter((n) => n !== 'root').sort()
   return (
-    <fieldset>
+    <fieldset className="pick-grid">
       <legend>Policies</legend>
       {error && <p role="alert">Could not load policies: {error.message}</p>}
       {names.map((n) => (

@@ -20,6 +20,7 @@
   --accent-soft: light-dark(#e2f3f0, #12302c);
   --danger: light-dark(#b42318, #ff8a7a);
   --danger-soft: light-dark(#fdecea, #3a1815);
+  --danger-ink: light-dark(#ffffff, #2a0b07);
   --warn: light-dark(#8a5a00, #f2c14e);
   --warn-soft: light-dark(#fff4d6, #3a2d0c);
 
@@ -898,17 +899,13 @@ td:last-child button + button {
 }
 
 @media (max-width: 48rem) {
-  .shell nav {
+  .shell > nav {
     flex-wrap: wrap;
     padding: 0 var(--s4);
   }
 
   .shell main {
     padding: var(--s5) var(--s4);
-  }
-
-  .graph-layout {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -1157,4 +1154,165 @@ button.link:hover:not(:disabled) {
   .secrets-layout {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ---------- Identity forms ---------- */
+
+form.wide {
+  max-width: 36rem;
+}
+
+form > h3 {
+  margin: 0;
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--s2);
+}
+
+/* Checkbox lists (policies, members) run in columns instead of one long stack. */
+.pick-grid {
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+}
+
+.pick-grid legend,
+.pick-grid > p {
+  grid-column: 1 / -1;
+}
+
+form .note-warn {
+  margin: 0;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  filter: brightness(1.08);
+}
+
+/* The one-time token: large, selectable, impossible to mistake for table content. */
+.secret-once p {
+  margin: 0 0 var(--s3);
+}
+
+.token-value {
+  display: block;
+  margin-bottom: var(--s3);
+  padding: var(--s3) var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  font-size: var(--text);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 60rem) {
+  .graph-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .graph-canvas {
+    height: 60vh;
+  }
+
+  .graph-details {
+    max-height: none;
+  }
+}
+
+@media (max-width: 40rem) {
+  /* Wide tables scroll sideways inside themselves rather than widening the page. */
+  table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .shell > nav .whoami {
+    display: none;
+  }
+
+  .graph-toolbar label:not(.check),
+  .graph-toolbar input:not([type='checkbox']) {
+    width: 100%;
+  }
+
+  .graph-toolbar button {
+    margin-left: 0;
+  }
+
+  .graph-legend .grow {
+    margin-left: 0;
+  }
+
+  .access-head,
+  .connection-head {
+    flex-wrap: wrap;
+  }
+}
+
+/* ---------- Confirm dialog ---------- */
+
+.confirm-dialog {
+  width: min(28rem, calc(100% - 2rem));
+  padding: var(--s5);
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.35);
+}
+
+.confirm-dialog::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+
+.confirm-dialog h2 {
+  margin: 0 0 var(--s2);
+  font-size: var(--text-lg);
+}
+
+.confirm-dialog p {
+  margin: 0 0 var(--s5);
+  color: var(--ink-soft);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s2);
+}
+
+button.danger-solid {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--danger-ink);
+}
+
+button.danger-solid:hover:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  filter: brightness(1.08);
+}
+
+/* Policy and name chips in tables: neutral, with EnvBao-managed policies tinted. */
+.chips.plain li {
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+
+.chips.plain li.managed {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
 }

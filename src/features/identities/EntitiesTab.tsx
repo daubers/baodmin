@@ -5,6 +5,8 @@ import { addAlias, deleteAlias, deleteEntity, listEntities, saveEntity, userpass
 import { AccessEditor } from '../access/AccessEditor'
 import { ListState } from '../shared/ListState'
 import { PolicyPicker } from '../shared/PolicyPicker'
+import { useConfirm } from '../shared/useConfirm'
+import { NameChips, PolicyChips } from '../shared/PolicyChips'
 
 interface Draft {
   name: string
@@ -15,6 +17,7 @@ interface Draft {
 
 export function EntitiesTab({ client }: { client: BaoClient }) {
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const entities = useQuery({ queryKey: ['entities'], queryFn: () => listEntities(client) })
   const [draft, setDraft] = useState<Draft | null>(null)
   const [accessFor, setAccessFor] = useState<string | null>(null)
@@ -71,19 +74,26 @@ export function EntitiesTab({ client }: { client: BaoClient }) {
           {entities.data?.map((e) => (
             <tr key={e.id}>
               <td>{e.name}</td>
-              <td>{e.aliases.map((a) => a.name).join(', ') || '—'}</td>
-              <td>{e.policies.join(', ') || '—'}</td>
+              <td>
+                <NameChips names={e.aliases.map((a) => a.name)} />
+              </td>
+              <td>
+                <PolicyChips policies={e.policies} />
+              </td>
               <td>
                 <button type="button" aria-label={`Access ${e.name}`} onClick={() => setAccessFor(e.name)}>
                   Access
-                </button>{' '}
+                </button>
                 <button type="button" aria-label={`Edit ${e.name}`} onClick={() => setDraft({ name: e.name, policies: e.policies, isNew: false, entity: e })}>
                   Edit
-                </button>{' '}
+                </button>
                 <button
                   type="button"
                   aria-label={`Delete ${e.name}`}
-                  onClick={() => window.confirm(`Delete entity "${e.name}" and its aliases?`) && remove.mutate(e.name)}
+                  onClick={async () => {
+                    if (await confirm({ title: `Delete entity “${e.name}”?`, message: 'Its aliases are deleted too. This cannot be undone.', confirmLabel: 'Delete' }))
+                      remove.mutate(e.name)
+                  }}
                 >
                   Delete
                 </button>
@@ -107,10 +117,10 @@ export function EntitiesTab({ client }: { client: BaoClient }) {
           </label>
           <PolicyPicker client={client} value={draft.policies} onChange={(policies) => setDraft({ ...draft, policies })} />
           {save.error && <p role="alert">{save.error.message}</p>}
-          <div>
+          <div className="form-actions">
             <button type="submit" disabled={save.isPending}>
               Save
-            </button>{' '}
+            </button>
             <button type="button" onClick={() => setDraft(null)}>
               Cancel
             </button>
@@ -121,7 +131,13 @@ export function EntitiesTab({ client }: { client: BaoClient }) {
               {draft.entity.aliases.map((a) => (
                 <div key={a.id}>
                   {a.name}{' '}
-                  <button type="button" onClick={() => window.confirm(`Remove alias "${a.name}"?`) && detach.mutate(a.id)}>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (await confirm({ title: `Remove alias “${a.name}”?`, message: 'The userpass user is no longer linked to this entity.', confirmLabel: 'Remove' }))
+                        detach.mutate(a.id)
+                    }}
+                  >
                     Remove
                   </button>
                 </div>

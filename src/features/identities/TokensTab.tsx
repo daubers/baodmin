@@ -5,6 +5,8 @@ import { createToken, listTokens, revokeToken, type CreatedToken } from '../../a
 import { useSession } from '../../api/useSession'
 import { ListState } from '../shared/ListState'
 import { PolicyPicker } from '../shared/PolicyPicker'
+import { useConfirm } from '../shared/useConfirm'
+import { PolicyChips } from '../shared/PolicyChips'
 
 interface Draft {
   displayName: string
@@ -25,6 +27,7 @@ function formatTtl(seconds: number): string {
 
 export function TokensTab({ client }: { client: BaoClient }) {
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const { tokenInfo } = useSession()
   const tokens = useQuery({ queryKey: ['tokens'], queryFn: () => listTokens(client) })
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -68,13 +71,15 @@ export function TokensTab({ client }: { client: BaoClient }) {
           <p>
             <strong>Copy this token now. It will not be shown again.</strong>
           </p>
-          <code>{created.token}</code>{' '}
-          <button type="button" onClick={copy}>
-            {copied ? 'Copied' : 'Copy'}
-          </button>{' '}
-          <button type="button" onClick={() => setCreated(null)}>
-            Done
-          </button>
+          <code className="token-value">{created.token}</code>
+          <div className="form-actions">
+            <button type="button" className="primary" onClick={copy}>
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+            <button type="button" onClick={() => setCreated(null)}>
+              Done
+            </button>
+          </div>
         </div>
       )}
       <ListState query={tokens} empty="No tokens." />
@@ -98,7 +103,9 @@ export function TokensTab({ client }: { client: BaoClient }) {
                   {t.display_name || '—'}
                   {isSelf ? ' (you)' : ''}
                 </td>
-                <td>{t.policies.join(', ') || '—'}</td>
+                <td>
+                  <PolicyChips policies={t.policies} />
+                </td>
                 <td>{formatTtl(t.ttl)}</td>
                 <td>
                   <code>{t.accessor.slice(0, 8)}…</code>
@@ -109,10 +116,14 @@ export function TokensTab({ client }: { client: BaoClient }) {
                     aria-label={`Revoke ${t.display_name || t.accessor}`}
                     disabled={isSelf}
                     title={isSelf ? 'This is the token you are signed in with' : undefined}
-                    onClick={() =>
-                      window.confirm(`Revoke token "${t.display_name || t.accessor}"? Tokens created from it are revoked too.`) &&
-                      revoke.mutate(t.accessor)
-                    }
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: `Revoke token “${t.display_name || t.accessor}”?`,
+                        message: 'Tokens created from it are revoked too.',
+                        confirmLabel: 'Revoke',
+                      })
+                      if (ok) revoke.mutate(t.accessor)
+                    }}
                   >
                     Revoke
                   </button>
@@ -130,7 +141,8 @@ export function TokensTab({ client }: { client: BaoClient }) {
         </button>
       )}
       {draft && (
-        <form onSubmit={submit} aria-label="New token">
+        <form onSubmit={submit} aria-label="New token" className="wide">
+          <h3>New token</h3>
           <label>
             Display name
             <input value={draft.displayName} onChange={(e) => setDraft({ ...draft, displayName: e.target.value })} />
@@ -143,15 +155,23 @@ export function TokensTab({ client }: { client: BaoClient }) {
             <input type="checkbox" checked={draft.renewable} onChange={(e) => setDraft({ ...draft, renewable: e.target.checked })} /> Renewable
           </label>
           <label className="check">
-            <input type="checkbox" checked={draft.orphan} onChange={(e) => setDraft({ ...draft, orphan: e.target.checked })} /> Orphan
-            (outlives the token you are signed in with; requires sudo)
+            <input type="checkbox" checked={draft.orphan} onChange={(e) => setDraft({ ...draft, orphan: e.target.checked })} />
+            <span>
+              Orphan <span className="hint">(outlives the token you are signed in with; requires sudo)</span>
+            </span>
           </label>
           <PolicyPicker client={client} value={draft.policies} onChange={(policies) => setDraft({ ...draft, policies })} />
+          {draft.policies.length === 0 && (
+            <p className="note-warn">
+              No policies selected: OpenBao gives the new token the same policies as yours
+              {tokenInfo?.policies.length ? ` (${tokenInfo.policies.join(', ')})` : ''}.
+            </p>
+          )}
           {create.error && <p role="alert">{create.error.message}</p>}
-          <div>
+          <div className="form-actions">
             <button type="submit" disabled={create.isPending}>
               Create
-            </button>{' '}
+            </button>
             <button type="button" onClick={() => setDraft(null)}>
               Cancel
             </button>
