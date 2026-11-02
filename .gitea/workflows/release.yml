@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: pkgs.daubney.dev
-  IMAGE: pkgs.daubney.dev/${{ github.repository }}
+  IMAGE: pkgs.daubney.dev/envbao/envbao-admin
 
 jobs:
   check:
