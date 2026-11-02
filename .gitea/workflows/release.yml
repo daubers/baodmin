@@ -58,3 +58,18 @@ jobs:
           docker build -t "$IMAGE:$VERSION" -t "$IMAGE:latest" .
           docker push "$IMAGE:$VERSION"
           docker push "$IMAGE:latest"
+
+  # Gitea cannot trigger another repo's workflow from a tag, so dispatch the deploy via the API.
+  trigger-deploy:
+    needs: [image]
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch the deploy
+        env:
+          TAG: ${{ github.ref_name }}
+          TOKEN: ${{ secrets.DEPLOY_DISPATCH_TOKEN }}
+        run: |
+          curl -fsS -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json" \
+            -d "{\"ref\":\"main\",\"inputs\":{\"tag\":\"$TAG\"}}" \
+            "${{ gitea.server_url }}/api/v1/repos/matt/EnvBaoAdminDeploy/actions/workflows/deploy.yml/dispatches"
