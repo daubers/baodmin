@@ -53,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Log in to the container registry
-        run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login "$REGISTRY" -u "${{ github.repository_owner }}" --password-stdin
+        run: echo "${{ secrets.PKGS_PASSWORD }}" | docker login "$REGISTRY" -u "${{ secrets.PKGS_USER }}" --password-stdin
       - name: Build and push
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
