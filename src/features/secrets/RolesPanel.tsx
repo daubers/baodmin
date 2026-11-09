@@ -15,6 +15,7 @@ import {
 import { ListState } from '../shared/ListState'
 import { useConfirm } from '../shared/useConfirm'
 import { GenerateCreds } from './GenerateCreds'
+import { RoleAccessPanel } from './RoleAccessPanel'
 import { RoleEditor } from './RoleEditor'
 
 export function RolesPanel({ client, mount, engine }: { client: BaoClient; mount: string; engine: EngineDef }) {
@@ -25,6 +26,7 @@ export function RolesPanel({ client, mount, engine }: { client: BaoClient; mount
   const [draft, setDraft] = useState<RoleDraft | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [credsFor, setCredsFor] = useState<string | null>(null)
+  const [accessFor, setAccessFor] = useState<string | null>(null)
 
   const key = ['engine-roles', mount, kind.id]
   const roles = useQuery({ queryKey: key, queryFn: () => listRoles(client, mount, kind) })
@@ -52,6 +54,7 @@ export function RolesPanel({ client, mount, engine }: { client: BaoClient; mount
     setKindId(id)
     setDraft(null)
     setCredsFor(null)
+    setAccessFor(null)
     save.reset()
   }
 
@@ -85,6 +88,9 @@ export function RolesPanel({ client, mount, engine }: { client: BaoClient; mount
                       Generate
                     </button>
                   )}
+                  <button type="button" aria-label={`Access ${name}`} onClick={() => setAccessFor(name)}>
+                    Access
+                  </button>
                   <button type="button" aria-label={`Edit ${name}`} onClick={() => edit.mutate(name)}>
                     Edit
                   </button>
@@ -119,6 +125,9 @@ export function RolesPanel({ client, mount, engine }: { client: BaoClient; mount
           kinds={kind.creds}
           onClose={() => setCredsFor(null)}
         />
+      )}
+      {accessFor && (
+        <RoleAccessPanel key={`${kind.id}/${accessFor}`} client={client} mount={mount} kind={kind} role={accessFor} onClose={() => setAccessFor(null)} />
       )}
       {remove.error && <p role="alert">{remove.error.message}</p>}
       {edit.error && <p role="alert">{edit.error.message}</p>}

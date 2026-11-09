@@ -4,11 +4,18 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { BaoClient } from '../../api/bao'
 import * as grants from '../../api/grants'
+import * as roles from '../../api/engines/roles'
 import * as secrets from '../../api/secrets'
 import { AccessEditor } from './AccessEditor'
 
 vi.mock('../../api/grants')
-vi.mock('../../api/secrets')
+vi.mock('../../api/engines/roles')
+vi.mock('../../api/secrets', async (orig) => ({
+  ...(await orig<typeof secrets>()),
+  listMounts: vi.fn(),
+  listSecrets: vi.fn(),
+  readPolicyHcl: vi.fn(),
+}))
 
 const client = new BaoClient('http://b', 't')
 const target = { kind: 'user' as const, name: 'alice' }
@@ -29,7 +36,7 @@ const state = (over: Partial<grants.GrantState> = {}): grants.GrantState => ({
 
 beforeEach(() => {
   vi.mocked(grants.getGrantState).mockResolvedValue(state())
-  vi.mocked(secrets.listKvMounts).mockResolvedValue([{ path: 'secret/' }])
+  vi.mocked(secrets.listMounts).mockResolvedValue([{ path: 'secret/', type: 'kv', version: '2' }])
   vi.mocked(secrets.listSecrets).mockImplementation(async (_c, _m, prefix) =>
     prefix === ''
       ? [
@@ -139,4 +146,33 @@ test('shows load errors', async () => {
   vi.mocked(grants.getGrantState).mockRejectedValue(new Error('permission denied'))
   setup()
   expect(await screen.findByRole('alert')).toHaveTextContent('permission denied')
+})
+
+test('grants generate on a dynamic-engine role from the identity side', async () => {
+  vi.mocked(secrets.listMounts).mockResolvedValue([
+    { path: 'secret/', type: 'kv', version: '2' },
+    { path: 'database/', type: 'database' },
+  ])
+  vi.mocked(roles.listRoles).mockResolvedValue(['readonly', 'readwrite'])
+  vi.mocked(grants.grantAccess).mockResolvedValue()
+  const user = setup()
+  await user.selectOptions(await screen.findByLabelText('Secrets engine'), 'database/')
+  await user.click(await screen.findByLabelText('readwrite'))
+  await user.click(screen.getByLabelText(/Manage role/))
+  await user.click(screen.getByRole('button', { name: 'Grant' }))
+  expect(grants.grantAccess).toHaveBeenCalledWith(client, target, [
+    { path: 'database/creds/readwrite', capabilities: ['read'] },
+    { path: 'database/roles/readwrite', capabilities: ['create', 'read', 'update', 'delete'] },
+    { path: 'database/roles', capabilities: ['list'] },
+  ])
+})
+
+test('a dynamic grant needs a role chosen', async () => {
+  vi.mocked(secrets.listMounts).mockResolvedValue([{ path: 'database/', type: 'database' }])
+  vi.mocked(roles.listRoles).mockResolvedValue(['readonly'])
+  const user = setup()
+  await screen.findByLabelText('readonly')
+  await user.click(screen.getByRole('button', { name: 'Grant' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Choose a role.')
+  expect(grants.grantAccess).not.toHaveBeenCalled()
 })

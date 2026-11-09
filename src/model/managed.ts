@@ -1,3 +1,4 @@
+import type { RoleKind } from '../api/engines/registry'
 import { MANAGED_PREFIX } from './graph'
 import { CAPABILITIES, parsePolicy, type Capability } from './policy'
 
@@ -93,4 +94,29 @@ export function kvGrantRules(mount: string, secretPath: string, caps: KvCapabili
     { path: `${m}data/${secretPath}`, capabilities: dataCaps },
     { path: `${m}metadata/${secretPath}`, capabilities: caps.includes('list') ? ['list'] : [] },
   ]
+}
+
+/** What a grant on a dynamic-engine role can allow. */
+export type DynamicAccess = 'generate' | 'manage'
+
+export const DYNAMIC_ACCESS: { id: DynamicAccess; label: string; help: string }[] = [
+  { id: 'generate', label: 'Generate credentials', help: 'Issue database logins, AWS keys, SSH certificates or OTPs from the role.' },
+  { id: 'manage', label: 'Manage role', help: 'View, change and delete the role, and list the roles of this kind.' },
+]
+
+/**
+ * Expand a grant on a dynamic-engine role (`role` may be "*" for every role of that kind) into API-path rules.
+ * Like kvGrantRules, a path that is not granted comes back with no capabilities so that writing the rules removes it;
+ * the shared "list roles" path is only emitted when managing, so revoking one role never hides the others.
+ */
+export function dynamicGrantRules(roleKind: RoleKind, mount: string, role: string, access: DynamicAccess[]): Grant[] {
+  const m = mount.endsWith('/') ? mount : `${mount}/`
+  const rules: Grant[] = roleKind.creds.map((c) => ({
+    path: m + c.path(role),
+    capabilities: access.includes('generate') ? c.capabilities : [],
+  }))
+  const manage = access.includes('manage')
+  rules.push({ path: `${m}${roleKind.path}/${role}`, capabilities: manage ? ['create', 'read', 'update', 'delete'] : [] })
+  if (manage) rules.push({ path: `${m}${roleKind.path}`, capabilities: ['list'] })
+  return rules
 }

@@ -2,16 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { engineFor, mountKind } from '../../api/engines/registry'
-import { listMounts, listSecrets } from '../../api/secrets'
+import { listSecrets } from '../../api/secrets'
 import { RequireConnection } from '../shared/RequireConnection'
+import { useMounts } from '../shared/useMounts'
 import { AccessPanel } from './AccessPanel'
 import { EngineView } from './EngineView'
 
 function Browser({ client }: { client: BaoClient }) {
-  const mounts = useQuery({
-    queryKey: ['mounts'],
-    queryFn: async () => (await listMounts(client)).filter((m) => mountKind(m) !== null),
-  })
+  const mounts = useMounts(client)
   const [mountChoice, setMount] = useState<string | null>(null)
   const [prefix, setPrefix] = useState('')
   const [selected, setSelected] = useState<string | null>(null)

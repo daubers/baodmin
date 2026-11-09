@@ -2,13 +2,17 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { getGrantState, grantAccess, revokeAccess, type Target } from '../../api/grants'
-import { listKvMounts, readPolicyHcl } from '../../api/secrets'
-import { kvGrantRules, validateGrantPath, type KvCapability } from '../../model/managed'
+import { engineFor, mountKind } from '../../api/engines/registry'
+import { readPolicyHcl } from '../../api/secrets'
+import { dynamicGrantRules, kvGrantRules, validateGrantPath, type DynamicAccess, type KvCapability } from '../../model/managed'
 import { groupGrants } from '../../model/grantRows'
 import { CapabilityChips } from '../shared/CapabilityChips'
 import { CapabilityPicker } from '../shared/CapabilityPicker'
+import { DynamicAccessPicker } from '../shared/DynamicAccessPicker'
+import { useMounts } from '../shared/useMounts'
 import { useRefreshAccess } from '../shared/useRefreshAccess'
 import { PathPicker } from './PathPicker'
+import { RolePicker, type RoleSelection } from './RolePicker'
 import { useConfirm } from '../shared/useConfirm'
 
 interface Props {
@@ -35,21 +39,29 @@ export function AccessEditor({ client, target, onClose }: Props) {
   const confirm = useConfirm()
   const stateKey = ['grant-state', target.kind, target.name]
   const state = useQuery({ queryKey: stateKey, queryFn: () => getGrantState(client, target) })
-  const mounts = useQuery({ queryKey: ['kv-mounts'], queryFn: () => listKvMounts(client) })
+  const mounts = useMounts(client)
 
   const [mountChoice, setMount] = useState<string | null>(null)
   const [secretPath, setSecretPath] = useState('')
   const [caps, setCaps] = useState<KvCapability[]>(['read'])
+  const [roleSel, setRoleSel] = useState<RoleSelection>({ kindId: '', role: '' })
+  const [access, setAccess] = useState<DynamicAccess[]>(['generate'])
   const [showRaw, setShowRaw] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const mount = mountChoice ?? mounts.data?.[0]?.path ?? ''
+  const current = mounts.data?.find((m) => m.path === mountChoice) ?? mounts.data?.[0]
+  const mount = current?.path ?? ''
+  const dynamic = current !== undefined && mountKind(current) === 'dynamic'
+  const engine = dynamic ? engineFor(current.type) : null
+  const roleKind = engine ? (engine.roleKinds.find((k) => k.id === roleSel.kindId) ?? engine.roleKinds[0]) : null
 
   const done = useRefreshAccess()
 
   const grant = useMutation({
-    mutationFn: () => grantAccess(client, target, kvGrantRules(mount, secretPath, caps)),
+    mutationFn: () =>
+      grantAccess(client, target, roleKind ? dynamicGrantRules(roleKind, mount, roleSel.role, access) : kvGrantRules(mount, secretPath, caps)),
     onSuccess: () => {
       setSecretPath('')
+      setRoleSel({ kindId: roleSel.kindId, role: '' })
       return done()
     },
   })
@@ -57,7 +69,10 @@ export function AccessEditor({ client, target, onClose }: Props) {
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    const err = validateGrantPath(secretPath) ?? (caps.length === 0 ? 'Select at least one capability.' : null)
+    const err = roleKind
+      ? (roleSel.role ? validateGrantPath(`${mount}${roleKind.path}/${roleSel.role}`) : 'Choose a role.') ??
+        (access.length === 0 ? 'Select at least one kind of access.' : null)
+      : (validateGrantPath(secretPath) ?? (caps.length === 0 ? 'Select at least one capability.' : null))
     setFormError(err)
     if (!err) grant.mutate()
   }
@@ -163,6 +178,7 @@ export function AccessEditor({ client, target, onClose }: Props) {
                   onChange={(e) => {
                     setMount(e.target.value)
                     setSecretPath('')
+                    setRoleSel({ kindId: '', role: '' })
                   }}
                 >
                   {mounts.data?.map((m) => (
@@ -170,10 +186,13 @@ export function AccessEditor({ client, target, onClose }: Props) {
                   ))}
                 </select>
               </label>
-              {mount && <PathPicker key={mount} client={client} mount={mount} value={secretPath} onChange={setSecretPath} />}
-              <CapabilityPicker value={caps} onChange={setCaps} />
+              {mount && engine && <RolePicker key={mount} client={client} mount={mount} engine={engine} value={roleSel} onChange={setRoleSel} />}
+              {mount && !engine && <PathPicker key={mount} client={client} mount={mount} value={secretPath} onChange={setSecretPath} />}
+              {engine ? <DynamicAccessPicker value={access} onChange={setAccess} /> : <CapabilityPicker value={caps} onChange={setCaps} />}
               <p className="hint">
-                Granting a path that already has a grant replaces its capabilities. “list” applies to the secret’s metadata path.
+                {engine
+                  ? 'Granting a role that already has a grant replaces its access. Unticked access is removed.'
+                  : 'Granting a path that already has a grant replaces its capabilities. “list” applies to the secret’s metadata path.'}
               </p>
               {(formError || grant.error) && <p role="alert">{formError ?? grant.error?.message}</p>}
               <button type="submit" disabled={grant.isPending || !mount}>

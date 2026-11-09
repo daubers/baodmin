@@ -64,7 +64,18 @@ export function AccessPanel({ client, mount, secret }: Props) {
   )
 }
 
-function Entries({ data, path }: { data: NonNullable<ReturnType<typeof useAccessInputs>['data']>; path: string }) {
+/** Who can reach `path`, from every identity's effective policies. */
+export function Entries({
+  data,
+  path,
+  label = 'Who can access this secret',
+  empty = 'No identity can reach this secret.',
+}: {
+  data: NonNullable<ReturnType<typeof useAccessInputs>['data']>
+  path: string
+  label?: string
+  empty?: string
+}) {
   const entries = accessForPath(data.identities, data.policies, path, pathMatches)
   return (
     <>
@@ -74,9 +85,9 @@ function Entries({ data, path }: { data: NonNullable<ReturnType<typeof useAccess
         </p>
       ))}
       {entries.length === 0 ? (
-        <p>No identity can reach this secret.</p>
+        <p>{empty}</p>
       ) : (
-        <table aria-label="Who can access this secret">
+        <table aria-label={label}>
           <thead>
             <tr>
               <th>Identity</th>

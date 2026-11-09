@@ -1,3 +1,4 @@
+import type { Capability } from '../../model/policy'
 import type { Mount } from '../secrets'
 import { isKvV2 } from '../secrets'
 
@@ -37,6 +38,8 @@ export interface CredKind {
   method: 'GET' | 'POST'
   /** Request parameters; only sent for POST. */
   inputs: FieldDef[]
+  /** ACL capabilities a token needs on `path` to make this request (and so what "generate" grants). */
+  capabilities: Capability[]
 }
 
 /** A one-off call on a config, e.g. rotating the root credentials. */
@@ -107,7 +110,7 @@ const DATABASE_ROLE: RoleKind = {
     { key: 'default_ttl', label: 'Default TTL', type: 'ttl' },
     { key: 'max_ttl', label: 'Max TTL', type: 'ttl' },
   ],
-  creds: [{ id: 'creds', label: 'Generate credentials', path: (r) => `creds/${encodeURIComponent(r)}`, method: 'GET', inputs: [] }],
+  creds: [{ id: 'creds', label: 'Generate credentials', path: (r) => `creds/${encodeURIComponent(r)}`, method: 'GET', inputs: [], capabilities: ['read'] }],
 }
 
 const DATABASE_STATIC_ROLE: RoleKind = {
@@ -121,7 +124,7 @@ const DATABASE_STATIC_ROLE: RoleKind = {
     { key: 'rotation_period', label: 'Rotation period', type: 'ttl' },
   ],
   creds: [
-    { id: 'static-creds', label: 'Read current credentials', path: (r) => `static-creds/${encodeURIComponent(r)}`, method: 'GET', inputs: [] },
+    { id: 'static-creds', label: 'Read current credentials', path: (r) => `static-creds/${encodeURIComponent(r)}`, method: 'GET', inputs: [], capabilities: ['read'] },
   ],
 }
 
@@ -152,6 +155,7 @@ const AWS_ROLE: RoleKind = {
       label: 'Generate credentials',
       path: (r) => `creds/${encodeURIComponent(r)}`,
       method: 'POST',
+      capabilities: ['read', 'update'],
       inputs: [
         { key: 'ttl', label: 'TTL', type: 'ttl', help: 'For STS credentials.' },
         { key: 'role_arn', label: 'Role ARN', type: 'text', help: 'Only when the role allows several.' },
@@ -181,6 +185,7 @@ const SSH_ROLE: RoleKind = {
       label: 'Sign a public key (CA)',
       path: (r) => `sign/${encodeURIComponent(r)}`,
       method: 'POST',
+      capabilities: ['update'],
       inputs: [
         { key: 'public_key', label: 'Public key', type: 'textarea', required: true },
         { key: 'valid_principals', label: 'Valid principals', type: 'text', help: 'Comma separated.' },
@@ -193,6 +198,7 @@ const SSH_ROLE: RoleKind = {
       label: 'Generate an OTP',
       path: (r) => `creds/${encodeURIComponent(r)}`,
       method: 'POST',
+      capabilities: ['update'],
       inputs: [
         { key: 'ip', label: 'Target IP', type: 'text', required: true },
         { key: 'username', label: 'Username', type: 'text' },

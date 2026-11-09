@@ -3,7 +3,11 @@ import { BaoClient } from '../bao'
 import { readConfig, runAction, writeConfig, deleteConfig } from './config'
 import { generateCreds } from './creds'
 import { listLeases, lookupLease, renewLease, revokeLease, revokePrefix } from './leases'
-import { listMounts } from '../secrets'
+import { accessForPath } from '../../model/graph'
+import { dynamicGrantRules, renderManagedPolicy } from '../../model/managed'
+import { pathMatches } from '../../model/policy'
+import { capabilitiesSelf, listMounts } from '../secrets'
+import { createToken, revokeToken } from '../tokens'
 import { ENGINES } from './registry'
 import { deleteRole, draftFromRole, emptyDraft, listRoles, payloadFromDraft, readRole, writeRole } from './roles'
 
@@ -124,5 +128,50 @@ describe('dynamic engine config and credentials', () => {
     const lease = ENGINES.aws.configs[1]
     await writeConfig(client, awsMount, lease, { lease: '30m', lease_max: '2h' })
     expect(await readConfig(client, awsMount, lease)).toMatchObject({ lease: '30m0s', lease_max: '2h0m0s' })
+  })
+})
+
+describe('grants on dynamic roles match what OpenBao enforces', () => {
+  const polName = `it-dyn-${sfx}`
+  const ca = ENGINES.ssh.configs[0]
+  let token: Awaited<ReturnType<typeof createToken>>
+
+  beforeAll(async () => {
+    const role = emptyDraft(kind)
+    role.values.allow_user_certificates = true
+    role.values.allowed_users = '*'
+    role.values.default_user = 'alice'
+    for (const name of ['granted', 'other']) await writeRole(client, mount, kind, name, payloadFromDraft(kind, role))
+    await runAction(client, mount, ca.actions![0])
+
+    const grants = dynamicGrantRules(kind, mount, 'granted', ['generate', 'manage']).filter((g) => g.capabilities.length)
+    await client.request('PUT', `sys/policies/acl/${polName}`, { policy: renderManagedPolicy('user', 'x', grants) })
+    token = await createToken(client, { displayName: polName, policies: [polName], renewable: false, orphan: false })
+  })
+
+  afterAll(async () => {
+    await revokeToken(client, token.accessor).catch(() => {})
+    await client.request('DELETE', `sys/policies/acl/${polName}`).catch(() => {})
+  })
+
+  test('capabilities-self agrees with the access model for granted and other roles', async () => {
+    const as = client.withToken(token.token)
+    const hcl = renderManagedPolicy('user', 'x', dynamicGrantRules(kind, mount, 'granted', ['generate', 'manage']).filter((g) => g.capabilities.length))
+    const who = [{ kind: 'user' as const, name: 'x', policies: [polName] }]
+    for (const role of ['granted', 'other']) {
+      for (const path of [`${mount}sign/${role}`, `${mount}creds/${role}`, `${mount}roles/${role}`]) {
+        const real = (await capabilitiesSelf(as, path)).filter((c) => c !== 'deny').sort()
+        const modelled = accessForPath(who, [{ name: polName, hcl }], path, pathMatches).flatMap((e) => e.capabilities).sort()
+        expect(modelled, path).toEqual(real)
+      }
+    }
+  })
+
+  test('the granted token can sign with its role and not with another', async () => {
+    const as = client.withToken(token.token)
+    const out = await generateCreds(as, mount, kind.creds[0], 'granted', { public_key: PUBLIC_KEY })
+    expect(String(out.data.signed_key)).toContain('cert-v01')
+    await expect(generateCreds(as, mount, kind.creds[0], 'other', { public_key: PUBLIC_KEY })).rejects.toThrow()
+    expect(await listRoles(as, mount, kind)).toEqual(expect.arrayContaining(['granted']))
   })
 })
