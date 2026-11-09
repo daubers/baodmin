@@ -173,17 +173,12 @@ main:focus {
   align-items: center;
   margin-left: auto;
   padding: 0 var(--s3);
-  color: var(--ink-faint);
   font-family: var(--mono);
   font-size: var(--text-sm);
 }
 
 .shell > nav .connect {
   margin-left: auto;
-}
-
-.shell > nav .whoami + .connect {
-  margin-left: 0;
 }
 
 .shell main {
@@ -888,6 +883,21 @@ td:last-child button + button {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
+/* With a node selected, its own links stand out and everything else steps back. */
+.gnode-linked .gnode-card {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.gnode-dim,
+.edge-dim {
+  opacity: 0.25;
+}
+
+.react-flow__edge.edge-linked .react-flow__edge-path {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
 /* Handles anchor the edges but aren't interactive. */
 .gnode-card .react-flow__handle {
   width: 1px;
@@ -1427,9 +1437,14 @@ button.danger-solid:hover:not(:disabled) {
   cursor: pointer;
 }
 
-.edge-label-selected {
+.edge-label-selected,
+.edge-label-linked {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.edge-label-dim {
+  opacity: 0.25;
 }
 
 /* Inline "Grant access" form inside the secret detail card. */

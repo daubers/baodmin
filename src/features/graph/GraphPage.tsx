@@ -34,6 +34,11 @@ function capabilityLabel(caps: string[] | undefined): string | undefined {
 
 function toFlow(graph: AccessGraph, selected: Selection | null, onEdgeSelect: (id: string) => void): { nodes: Node[]; edges: Edge[] } {
   const pos = layoutColumns(graph)
+  // Selecting a node highlights every edge into or out of it, and the boxes at their far ends.
+  const focus = selected?.kind === 'node' ? selected.id : null
+  const linkedEdges = new Set(graph.edges.filter((e) => e.source === focus || e.target === focus).map((e) => e.id))
+  const linkedNodes = new Set<string>(focus ? [focus] : [])
+  for (const e of graph.edges) if (linkedEdges.has(e.id)) linkedNodes.add(e.source).add(e.target)
   const nodes: Node[] = graph.nodes.map((n) => ({
     id: n.id,
     position: pos.get(n.id)!,
@@ -45,6 +50,8 @@ function toFlow(graph: AccessGraph, selected: Selection | null, onEdgeSelect: (i
       n.type === 'policy' && n.missing ? 'gnode-missing' : '',
       n.type === 'policy' && n.managed ? 'gnode-managed' : '',
       selected?.kind === 'node' && selected.id === n.id ? 'gnode-selected' : '',
+      focus && n.id !== focus && linkedNodes.has(n.id) ? 'gnode-linked' : '',
+      focus && !linkedNodes.has(n.id) ? 'gnode-dim' : '',
     ].join(' '),
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
@@ -59,6 +66,8 @@ function toFlow(graph: AccessGraph, selected: Selection | null, onEdgeSelect: (i
       target: e.target,
       markerEnd: { type: MarkerType.ArrowClosed },
       selected: selected?.kind === 'edge' && selected.id === e.id,
+      className: focus ? (linkedEdges.has(e.id) ? 'edge-linked' : 'edge-dim') : undefined,
+      zIndex: linkedEdges.has(e.id) ? 1 : 0,
     }
     const label = capabilityLabel(e.capabilities)
     if (!label) return base
@@ -66,6 +75,8 @@ function toFlow(graph: AccessGraph, selected: Selection | null, onEdgeSelect: (i
     const data: GrantEdgeData = {
       label,
       offset: (siblings.indexOf(e.id) - (siblings.length - 1) / 2) * 24,
+      linked: linkedEdges.has(e.id),
+      dim: focus !== null && !linkedEdges.has(e.id),
       onSelect: () => onEdgeSelect(e.id),
     }
     return { ...base, type: 'grant', data: data as unknown as Record<string, unknown> }

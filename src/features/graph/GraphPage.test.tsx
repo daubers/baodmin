@@ -16,19 +16,19 @@ import { GraphPage } from './GraphPage'
 // jsdom can't lay out React Flow, so render nodes/edges as plain buttons that fire the same callbacks.
 vi.mock('@xyflow/react', () => ({
   ReactFlow: (p: {
-    nodes: { id: string; data: { label: string } }[]
-    edges: { id: string; label?: string }[]
+    nodes: { id: string; className?: string; data: { label: string } }[]
+    edges: { id: string; className?: string; label?: string }[]
     onNodeClick: (e: unknown, n: { id: string }) => void
     onEdgeClick: (e: unknown, ed: { id: string }) => void
   }) => (
     <div>
       {p.nodes.map((n) => (
-        <button key={n.id} type="button" onClick={(e) => p.onNodeClick(e, n)}>
+        <button key={n.id} type="button" data-class={n.className} onClick={(e) => p.onNodeClick(e, n)}>
           node {n.data.label}
         </button>
       ))}
       {p.edges.map((ed) => (
-        <button key={ed.id} type="button" onClick={(e) => p.onEdgeClick(e, ed)}>
+        <button key={ed.id} type="button" data-class={ed.className} onClick={(e) => p.onEdgeClick(e, ed)}>
           edge {ed.id}
         </button>
       ))}
@@ -139,4 +139,35 @@ test('grants in unmanaged policies cannot be revoked', async () => {
   await user.click(screen.getByRole('button', { name: 'edge policy:legacy->path:secret/data/other' }))
   expect(screen.queryByRole('button', { name: 'Revoke' })).not.toBeInTheDocument()
   expect(screen.getByText(/does not manage/)).toBeInTheDocument()
+})
+
+const cls = (name: string) => screen.getByRole('button', { name }).getAttribute('data-class') ?? ''
+
+test('selecting a node highlights its links and dims the rest', async () => {
+  const user = await open()
+  // nothing is dimmed until something is selected
+  expect(cls('node bob')).not.toContain('gnode-dim')
+  expect(cls('edge policy:legacy->path:secret/data/other')).not.toContain('edge-')
+
+  await user.click(screen.getByRole('button', { name: 'node envbao-user-alice' }))
+
+  // its links, in and out, are highlighted, with the boxes at their far ends
+  expect(cls('edge policy:envbao-user-alice->path:secret/data/app/*')).toContain('edge-linked')
+  expect(cls('edge identity:user:alice->policy:envbao-user-alice')).toContain('edge-linked')
+  expect(cls('node alice')).toContain('gnode-linked')
+  expect(cls('node secret/data/app/*')).toContain('gnode-linked')
+  expect(cls('node envbao-user-alice')).toContain('gnode-selected')
+  // an unrelated chain steps back
+  expect(cls('edge policy:legacy->path:secret/data/other')).toContain('edge-dim')
+  expect(cls('node bob')).toContain('gnode-dim')
+  expect(cls('node legacy')).toContain('gnode-dim')
+})
+
+test('clearing the selection, or selecting an edge, removes the highlight', async () => {
+  const user = await open()
+  await user.click(screen.getByRole('button', { name: 'node alice' }))
+  expect(cls('node bob')).toContain('gnode-dim')
+  await user.click(screen.getByRole('button', { name: 'edge policy:legacy->path:secret/data/other' }))
+  expect(cls('node bob')).not.toContain('gnode-dim')
+  expect(cls('edge policy:envbao-user-alice->path:secret/data/app/*')).not.toContain('edge-dim')
 })

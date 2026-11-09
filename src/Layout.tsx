@@ -26,10 +26,16 @@ export function Layout() {
             {l.label}
           </NavLink>
         ))}
-        {client && tokenInfo && <span className="whoami">{tokenInfo.display_name || 'token'}</span>}
-        <NavLink to="/connect" className="connect">
-          {client ? 'Connection' : 'Connect'}
-        </NavLink>
+        {client ? (
+          // Signed in: the name is the way back to the connection details and Disconnect.
+          <NavLink to="/connect" className="whoami" title="Connection details and sign out">
+            {tokenInfo?.display_name || 'token'}
+          </NavLink>
+        ) : (
+          <NavLink to="/connect" className="connect">
+            Connect
+          </NavLink>
+        )}
       </nav>
       {notice && (
         <div role="alert" className="notice">
