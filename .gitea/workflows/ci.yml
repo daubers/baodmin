@@ -33,9 +33,20 @@ jobs:
           BAO_DEV_ROOT_TOKEN_ID: root
           BAO_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
         options: --cap-add=IPC_LOCK
+      # For the database secrets engine tests. Reached by service name from OpenBao, so no host port.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: app
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d app"
+          --health-interval 2s
+          --health-retries 15
     env:
       BAO_ADDR: http://openbao:8200
       BAO_TOKEN: root
+      BAO_PG_URL: postgresql://postgres:postgres@postgres:5432/app?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

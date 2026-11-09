@@ -1,0 +1,6 @@
+# sample application config (fake values)
+service: orders-api
+environment: demo
+database:
+  host: postgres
+  name: app

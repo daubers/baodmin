@@ -6,11 +6,12 @@ import * as ids from './identities'
 import * as secrets from './secrets'
 import * as tokens from './tokens'
 import { kvGrantRules } from '../model/managed'
-import { deleteConfig, readConfig, runAction } from './engines/config'
+import { deleteConfig, listConfigs, readConfig, runAction, writeConfig } from './engines/config'
 import { generateCreds } from './engines/creds'
 import { listLeases, lookupLease, renewLease, revokeLease, revokePrefix } from './engines/leases'
 import { ENGINES } from './engines/registry'
-import { deleteRole, listRoles, readRole, writeRole } from './engines/roles'
+import { pgTarget } from '../test/postgres'
+import { deleteRole, emptyDraft, listRoles, payloadFromDraft, readRole, writeRole } from './engines/roles'
 
 // Everything the UI does, run with ONLY docs/envbao-admin.hcl (plus the default policy), so the
 // documented least-privilege policy can't silently drift from what the app needs.
@@ -153,5 +154,52 @@ describe('the admin policy covers dynamic engines (ssh at the default mount)', (
     await deleteRole(admin, 'ssh/', role, sshRole)
     await deleteRole(admin, 'ssh/', role, `${sshRole}-otp`)
     await deleteConfig(admin, 'ssh/', ca)
+  })
+})
+
+// Same idea for the database engine at database/, when BAO_PG_URL points at a Postgres (see src/test/postgres.ts).
+describe('the admin policy covers the database engine (at the default mount)', () => {
+  const pg = pgTarget()
+  const db = ENGINES.database
+  let mounted = false
+
+  beforeAll(async () => {
+    const mounts = await root.request<{ data: Record<string, unknown> }>('GET', 'sys/mounts')
+    if (pg && !('database/' in mounts.data)) {
+      await root.request('POST', 'sys/mounts/database', { type: 'database' })
+      mounted = true
+    }
+  })
+  afterAll(async () => {
+    if (mounted) await root.request('DELETE', 'sys/mounts/database').catch(() => {})
+  })
+
+  test('connection, roles, credentials and leases', async (ctx) => {
+    if (!mounted) ctx.skip()
+    const conn = db.configs[0]
+    const kind = db.roleKinds[0]
+    const cfg = emptyDraft(conn)
+    Object.assign(cfg.values, pg!.values)
+    await writeConfig(admin, 'database/', conn, payloadFromDraft(conn, cfg), 'app')
+    expect(await listConfigs(admin, 'database/', conn)).toEqual(['app'])
+    expect(await readConfig(admin, 'database/', conn, 'app')).not.toBeNull()
+    await runAction(admin, 'database/', conn.actions![1], 'app')
+
+    const role = emptyDraft(kind)
+    role.values.db_name = 'app'
+    role.values.creation_statements = pg!.creationStatements
+    await writeRole(admin, 'database/', kind, 'ro', payloadFromDraft(kind, role))
+    expect(await listRoles(admin, 'database/', kind)).toEqual(['ro'])
+    expect((await readRole(admin, 'database/', kind, 'ro')).db_name).toBe('app')
+
+    const creds = await generateCreds(admin, 'database/', kind.creds[0], 'ro', {})
+    expect((await listLeases(admin, 'database/creds/ro/')).length).toBe(1)
+    expect((await lookupLease(admin, creds.leaseId)).id).toBe(creds.leaseId)
+    await revokeLease(admin, creds.leaseId)
+    await generateCreds(admin, 'database/', kind.creds[0], 'ro', {})
+    await revokePrefix(admin, 'database/creds/ro/')
+
+    await deleteRole(admin, 'database/', kind, 'ro')
+    await deleteConfig(admin, 'database/', conn, 'app')
   })
 })

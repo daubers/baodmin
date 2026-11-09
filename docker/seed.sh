@@ -37,6 +37,12 @@ path "secret/data/team-a/*" {
 path "secret/metadata/team-a/*" {
   capabilities = ["list"]
 }
+path "database/creds/readonly" {
+  capabilities = ["read"]
+}
+path "ssh/sign/demo" {
+  capabilities = ["update"]
+}
 POLICY
 
 bao policy write envbao-user-bob - >/dev/null <<'POLICY'
@@ -57,6 +63,9 @@ path "secret/data/app/*" {
 }
 path "secret/metadata/app/*" {
   capabilities = ["list"]
+}
+path "database/creds/*" {
+  capabilities = ["read"]
 }
 POLICY
 
@@ -87,4 +96,59 @@ bao write identity/group name=platform member_entity_ids="$alice_id" policies=en
 # --- A token ---
 bao token create -display-name=ci-deploy -policy=envbao-user-bob -ttl=24h >/dev/null
 
+# --- Dynamic secrets: database (Postgres service "postgres", see docker/postgres/init.sql) ---
+bao secrets enable database >/dev/null
+bao write database/config/app \
+  plugin_name=postgresql-database-plugin \
+  allowed_roles="readonly,readwrite,app-static" \
+  connection_url="postgresql://{{username}}:{{password}}@postgres:5432/app?sslmode=disable" \
+  username=openbao password=openbao-sample >/dev/null
+
+# Statements are JSON on stdin because they contain quotes and semicolons.
+bao write database/roles/readonly - >/dev/null <<'JSON'
+{
+  "db_name": "app",
+  "creation_statements": [
+    "CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';",
+    "GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";"
+  ],
+  "default_ttl": "1h",
+  "max_ttl": "24h"
+}
+JSON
+bao write database/roles/readwrite - >/dev/null <<'JSON'
+{
+  "db_name": "app",
+  "creation_statements": [
+    "CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';",
+    "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";",
+    "GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";"
+  ],
+  "default_ttl": "1h",
+  "max_ttl": "8h"
+}
+JSON
+# A fixed login whose password OpenBao rotates, rather than a new login per request.
+bao write database/static-roles/app-static db_name=app username=app_static rotation_period=24h >/dev/null
+
+# --- Dynamic secrets: SSH certificates (the "sshd" service trusts this CA) ---
+bao secrets enable ssh >/dev/null
+bao write ssh/config/ca generate_signing_key=true >/dev/null
+bao write ssh/roles/demo - >/dev/null <<'JSON'
+{
+  "key_type": "ca",
+  "allow_user_certificates": true,
+  "allowed_users": "deploy,alice",
+  "default_user": "deploy",
+  "default_extensions": { "permit-pty": "" },
+  "ttl": "30m",
+  "max_ttl": "4h"
+}
+JSON
+
+# A couple of live leases so the Leases tab has something to show (credentials discarded).
+bao read database/creds/readonly >/dev/null
+bao read database/creds/readwrite >/dev/null
+
 echo "Sample data loaded. Sign in as alice, bob or carol with password: password123"
+echo "Dynamic engines: database/ (Postgres) and ssh/ (certificates for the sshd service, port 2222)."

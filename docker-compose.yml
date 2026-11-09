@@ -1,6 +1,8 @@
-# Local demo: the UI plus a throwaway in-memory OpenBao dev server.
+# Local demo: the UI, a throwaway in-memory OpenBao dev server, and the things its dynamic secrets engines
+# manage: a Postgres database and an SSH server that trusts OpenBao's SSH CA.
 #   docker compose up --build
 # UI: http://localhost:8080   OpenBao: http://localhost:8200   token: root
+# Postgres: localhost:5433 (database "app")   SSH: localhost:2222 (users "deploy" and "alice", certificates only)
 services:
   openbao:
     image: openbao/openbao:latest
@@ -15,12 +17,29 @@ services:
       interval: 2s
       retries: 15
 
+  # Sample database for the "database" secrets engine. OpenBao connects as the "openbao" role (docker/postgres/init.sql).
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD: postgres-sample
+    volumes:
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "app"]
+      interval: 2s
+      retries: 15
+
   # One-shot: allow the UI origin to call OpenBao from the browser, then load sample
-  # secrets, users, entities, a group and a token (see docker/seed.sh).
+  # secrets, users, entities, a group, a token and the dynamic engines (see docker/seed.sh).
   openbao-setup:
     image: openbao/openbao:latest
     depends_on:
       openbao:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     environment:
       BAO_ADDR: http://openbao:8200
@@ -29,6 +48,18 @@ services:
       - ./docker/seed.sh:/seed.sh:ro
     entrypoint: ["sh", "/seed.sh"]
     restart: "no"
+
+  # Sample SSH server for the "ssh" secrets engine. It trusts the CA that seed.sh generates, so a certificate
+  # signed by OpenBao logs in; there are no passwords. See docker/sshd.
+  sshd:
+    build: ./docker/sshd
+    depends_on:
+      openbao-setup:
+        condition: service_completed_successfully
+    environment:
+      BAO_ADDR: http://openbao:8200
+    ports:
+      - "127.0.0.1:2222:22"
 
   ui:
     build: .

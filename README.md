@@ -34,6 +34,13 @@ Open http://localhost:8080 and connect to `http://localhost:8200` with token `ro
 
 The stack also loads sample data from [`docker/seed.sh`](docker/seed.sh): five secrets under `secret/` (`app/`, `shared/`, `team-a/`), userpass users `alice`, `bob` and `carol` (password `password123`), entities for alice and bob, a `platform` group, a few grants, and a `ci-deploy` token. Edit the script to change it. If you already have the stack running, `docker compose down` first: the setup step only runs on a fresh start.
 
+It also runs two things for the dynamic secrets engines to manage:
+
+- **Postgres** (database `app`, published on `127.0.0.1:5433`; sample `customers` and `orders` tables from [`docker/postgres/init.sql`](docker/postgres/init.sql)). The `database/` engine is wired to it with `readonly` and `readwrite` roles, an `app-static` role whose password OpenBao rotates, and a couple of live leases. Under **Secrets → database/**, click **Generate** on a role to get a working login, for example `psql -h 127.0.0.1 -p 5433 -U <username> app`.
+- **An SSH server** (`127.0.0.1:2222`, users `deploy` and `alice`, with sample files). It accepts only certificates signed by the CA in OpenBao's `ssh/` engine. Under **Secrets → ssh/ → demo**, click **Generate**, paste a public key (`ssh-keygen -t ed25519 -f demo -N ''`, then `cat demo.pub`), save the signed key as `demo-cert.pub`, and run `ssh -i demo -o CertificateFile=demo-cert.pub -p 2222 deploy@127.0.0.1`.
+
+The AWS engine is not part of the demo (it needs an AWS account).
+
 To run just the UI image: `docker build -t envbao-admin . && docker run -p 8080:80 envbao-admin`.
 
 ## OpenBao setup
@@ -97,7 +104,7 @@ The AWS engine is not built into every OpenBao release (some ship it as an exter
 
 ### Admin policy for the UI
 
-Least privilege for the account that uses the UI. The same policy is kept in [`docs/envbao-admin.hcl`](docs/envbao-admin.hcl), and the integration tests run every UI operation with only this policy, so it is known to be sufficient:
+Least privilege for the account that uses the UI. The same policy is kept in [`docs/envbao-admin.hcl`](docs/envbao-admin.hcl), and the integration tests run the UI operations with only this policy, so it is known to be sufficient for them. That covers identities, KV, the SSH engine and (when a Postgres is available) the database engine. The AWS rules follow the engine's documented paths but are not exercised against a live AWS engine:
 
 ```hcl
 # Least-privilege policy for the account that uses EnvBao Admin.
@@ -244,6 +251,10 @@ BAO_ADDR=http://127.0.0.1:8200 BAO_TOKEN=root npm run test:integration   # again
 ```
 
 The integration tests need a dev server with userpass available (they enable it if missing) and a KV v2 mount at `secret/` (the dev-mode default). They create and delete their own uniquely named objects, but run them against a throwaway instance, not a real one.
+
+The dynamic-engine tests mount their own `ssh` engine (built into OpenBao). The database tests are skipped unless `BAO_PG_URL` points at a Postgres whose user has `CREATEROLE`, as seen from OpenBao, for example `BAO_PG_URL='postgresql://postgres:secret@postgres:5432/app?sslmode=disable'`; CI starts one as a service, and `docker compose up -d postgres` gives you one on `127.0.0.1:5433`. The admin-policy tests use the default `ssh/` and `database/` mounts and skip those checks when the mount already exists, so they never overwrite a real CA or connection. The AWS engine tests skip when the server does not have it.
+
+Some test files enable `userpass` at the same time, which can fail with `path is already in use at userpass/`. If that happens, add `-- --no-file-parallelism`.
 
 CI runs on Gitea Actions (`.gitea/workflows/ci.yml`): lint, test and build, plus an integration job against an OpenBao dev container.
 

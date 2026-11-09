@@ -1,0 +1,12 @@
+# Certificate logins only: no passwords, no root.
+Port 22
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_rsa_key
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+AllowUsers deploy alice
+# Written by entrypoint.sh from OpenBao's ssh/ engine.
+TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem
+LogLevel VERBOSE

@@ -1,0 +1,3 @@
+Alice's notes (sample data)
+- rotate the staging database password
+- ask platform about the new SSH role
