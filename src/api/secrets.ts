@@ -21,16 +21,37 @@ export interface Mount {
   type: string
   /** KV version ("1" | "2") when the engine is KV. */
   version?: string
+  description?: string
+  /**
+   * Seconds explicitly set on this mount, 0 when it uses the system default. (sys/mounts/<path>/tune reports the
+   * effective value instead, which would pin the default if it were saved back.)
+   */
+  defaultLeaseTtl?: number
+  maxLeaseTtl?: number
 }
 
 /** Every secrets engine mount visible to the token, sorted by path. */
 export async function listMounts(c: BaoClient): Promise<Mount[]> {
-  const res = await c.request<{ data: Record<string, { type: string; options?: { version?: string } | null }> }>(
-    'GET',
-    'sys/mounts',
-  )
+  const res = await c.request<{
+    data: Record<
+      string,
+      {
+        type: string
+        description?: string
+        options?: { version?: string } | null
+        config?: { default_lease_ttl?: number; max_lease_ttl?: number }
+      }
+    >
+  }>('GET', 'sys/mounts')
   return Object.entries(res.data)
-    .map(([path, m]) => ({ path, type: m.type, version: m.options?.version }))
+    .map(([path, m]) => ({
+      path,
+      type: m.type,
+      version: m.options?.version,
+      description: m.description,
+      defaultLeaseTtl: m.config?.default_lease_ttl,
+      maxLeaseTtl: m.config?.max_lease_ttl,
+    }))
     .sort((a, b) => a.path.localeCompare(b.path))
 }
 

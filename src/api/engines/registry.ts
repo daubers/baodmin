@@ -347,3 +347,42 @@ export function mountKind(m: Mount): MountKind | null {
   if (NOT_DYNAMIC.has(m.type)) return null
   return 'dynamic'
 }
+
+/** An engine type that can be mounted from the UI, with the settings its mount form offers. */
+export interface MountType {
+  /** Engine type for sys/mounts. */
+  type: string
+  label: string
+  /** Mount options, e.g. KV version 2. */
+  options?: Record<string, string>
+  /** Settings kept on the mount itself (sys/mounts). */
+  fields: FieldDef[]
+  /** KV v2 settings kept by the engine at `<mount>config`, not by sys/mounts. */
+  configFields: FieldDef[]
+}
+
+const DESCRIPTION: FieldDef = { key: 'description', label: 'Description', type: 'text' }
+const LEASE_TTLS: FieldDef[] = [
+  { key: 'default_lease_ttl', label: 'Default lease TTL', type: 'ttl', help: 'Blank uses the system default.' },
+  { key: 'max_lease_ttl', label: 'Max lease TTL', type: 'ttl', help: 'Blank uses the system default.' },
+]
+
+export const MOUNT_TYPES: MountType[] = [
+  {
+    type: 'kv',
+    label: 'KV v2',
+    options: { version: '2' },
+    fields: [DESCRIPTION],
+    configFields: [
+      { key: 'max_versions', label: 'Max versions', type: 'text', help: 'Versions kept per secret. 0 keeps the system default.' },
+      { key: 'cas_required', label: 'Require check-and-set on writes', type: 'bool' },
+      { key: 'delete_version_after', label: 'Delete versions after', type: 'ttl', help: 'Blank never deletes them.' },
+    ],
+  },
+  { type: 'database', label: 'Database', fields: [DESCRIPTION, ...LEASE_TTLS], configFields: [] },
+  { type: 'aws', label: 'AWS', fields: [DESCRIPTION, ...LEASE_TTLS], configFields: [] },
+  { type: 'ssh', label: 'SSH', fields: [DESCRIPTION, ...LEASE_TTLS], configFields: [] },
+]
+
+/** The mount form for a mounted engine, or null for one the UI can't create (it can still delete it). */
+export const mountTypeFor = (m: Pick<Mount, 'type'>): MountType | null => MOUNT_TYPES.find((t) => t.type === m.type) ?? null
