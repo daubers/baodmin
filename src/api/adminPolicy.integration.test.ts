@@ -11,6 +11,8 @@ import { generateCreds } from './engines/creds'
 import { listLeases, lookupLease, renewLease, revokeLease, revokePrefix } from './engines/leases'
 import { ENGINES } from './engines/registry'
 import { pgTarget } from '../test/postgres'
+import { createMount, deleteMount, mountImpact, PartialMountError, readKvConfig, tuneMount } from './mounts'
+import { MOUNT_TYPES } from './engines/registry'
 import { deleteRole, emptyDraft, listRoles, payloadFromDraft, readRole, writeRole } from './engines/roles'
 
 // Everything the UI does, run with ONLY docs/envbao-admin.hcl (plus the default policy), so the
@@ -201,5 +203,48 @@ describe('the admin policy covers the database engine (at the default mount)', (
 
     await deleteRole(admin, 'database/', kind, 'ro')
     await deleteConfig(admin, 'database/', conn, 'app')
+  })
+})
+
+describe('the admin policy covers managing secrets engine mounts', () => {
+  const kv = MOUNT_TYPES.find((t) => t.type === 'kv')!
+  const sshType = MOUNT_TYPES.find((t) => t.type === 'ssh')!
+  const made: string[] = []
+  afterAll(async () => {
+    for (const p of made) await root.request('DELETE', `sys/mounts/${p}`).catch(() => {})
+  })
+  const find = async (path: string) => (await secrets.listMounts(admin)).find((m) => m.path === path)
+
+  test('create, tune, inspect and delete a dynamic engine', async () => {
+    const path = `it-pol-ssh-${sfx}`
+    made.push(path)
+    await createMount(admin, path, sshType, { description: 'hosts', default_lease_ttl: '1h' })
+    expect(await find(`${path}/`)).toMatchObject({ type: 'ssh', description: 'hosts', defaultLeaseTtl: 3600 })
+    await tuneMount(admin, path, sshType, { description: 'changed' })
+    expect(await find(`${path}/`)).toMatchObject({ description: 'changed', defaultLeaseTtl: 0 })
+    expect((await mountImpact(admin, `${path}/`, 'ssh')).kind).toBe('dynamic')
+    await deleteMount(admin, path)
+    expect(await find(`${path}/`)).toBeUndefined()
+  })
+
+  test('create and delete a KV v2 store without settings', async () => {
+    const path = `it-pol-kv-${sfx}`
+    made.push(path)
+    await createMount(admin, path, kv, { description: 'plain' })
+    expect(await find(`${path}/`)).toMatchObject({ type: 'kv', version: '2' })
+    await deleteMount(admin, path)
+  })
+
+  test('KV settings work on secret/ but not on other mounts, which the README says', async () => {
+    // secret/config is the one KV config path the policy names
+    const before = await readKvConfig(admin, 'secret/')
+    await tuneMount(admin, 'secret/', kv, { description: 'key/value secret storage', max_versions: String(before.max_versions), cas_required: before.cas_required === true })
+
+    const path = `it-pol-kvset-${sfx}`
+    made.push(path)
+    const err = await createMount(admin, path, kv, { max_versions: '3' }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(PartialMountError)
+    expect((err as Error).message).toMatch(/was mounted, but saving its KV settings failed: .*permission denied/s)
+    expect(await find(`${path}/`)).toBeDefined()
   })
 })

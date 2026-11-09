@@ -11,6 +11,7 @@ The UI talks directly to the OpenBao HTTP API from the browser. There is no back
 - **Connect** with a token or a userpass login. Refuses sealed or uninitialised servers, and explains CORS and connection problems.
 - **Identities**: create, edit and delete userpass users, identity entities (with userpass aliases) and groups; create, list and revoke tokens. A new token's value is shown once.
 - **Secrets**: browse KV v2 mounts and paths (names only; KV secret values are never read) and see which identities can reach a secret, through which policy, with which capabilities.
+- **Secrets engines**: create (KV v2, database, AWS, SSH), change the settings of, and delete secrets engine mounts, including KV v2 settings such as max versions. Deleting asks you to type the mount path, and says what will be lost and which policies still refer to it.
 - **Dynamic secrets**: for database (Postgres, ...), AWS and SSH engines, and a raw-JSON editor for any other engine type: create, edit and delete roles; configure the engine (database connections with rotate and reset, AWS root and lease, the SSH signing CA); generate credentials, sign SSH keys or issue OTPs; and browse, renew and revoke leases. Issued credentials are shown once and are never stored or cached by the UI. Passwords and private keys you type into config forms are write-only: they are never shown again.
 - **Access**: from an identity's **Access** button, grant it capabilities on a secret path (globs allowed) or access to a dynamic-engine role (generate credentials, manage the role), or revoke them, without writing policy HCL. A role's **Access** button shows who can already use it.
 - **Graph**: Identity → Policy → Path graph, filterable by identity and path. Click a policy→path edge to revoke that grant.
@@ -92,7 +93,7 @@ bao auth enable userpass
 bao secrets enable -path=secret -version=2 kv   # skip if already mounted
 ```
 
-Dynamic engines are optional and appear under **Secrets** once mounted:
+Dynamic engines are optional and appear under **Secrets** once mounted. You can mount them from the UI (**Secrets → New secrets engine**) or with the CLI:
 
 ```sh
 bao secrets enable database
@@ -135,6 +136,12 @@ path "auth/token/revoke-accessor" { capabilities = ["update"] }
 # Discovery: mounted auth methods and secrets engines, and KV v2 metadata for the secret browser
 path "sys/auth"            { capabilities = ["read"] }
 path "sys/mounts"          { capabilities = ["read"] }
+
+# Secrets engine mounts: create, change (tune) and delete. Deleting a mount destroys everything in it
+# and revokes its leases, so this is a powerful rule; leave it out if mounts are managed elsewhere.
+path "sys/mounts/*"        { capabilities = ["create", "read", "update", "delete"] }
+# KV v2 settings (max versions, check-and-set) of the KV mount
+path "secret/config"       { capabilities = ["read", "update"] }
 path "secret/metadata/*"   { capabilities = ["list"] }
 
 # Dynamic secrets engines: roles, config, credentials and leases. The paths use the default mount
@@ -182,7 +189,9 @@ Notes:
 
 - Listing token accessors needs `sudo` in OpenBao, so the Tokens tab needs it on `auth/token/accessors`.
 - Creating **orphan** tokens (the "Orphan" checkbox) needs `sudo` on `auth/token/create`. It is deliberately not granted above; add `"sudo"` there if you want it.
-- If your KV v2 mount is not `secret/`, change `secret/metadata/*`. The dynamic-engine rules name the default mounts (`database/`, `aws/`, `ssh/`), so change those too, or repeat a block for each mount. They deliberately avoid a `+/roles/*` wildcard, which would also match system paths such as `sys/config/cors`.
+- The `sys/mounts/*` rule lets this account create, change and **delete any secrets engine**, which destroys its data and revokes its leases. Remove it (and the New / Settings / Delete buttons will report permission denied) if mounts are managed elsewhere. Mounting, tuning and deleting do not need `sudo`.
+- KV v2 settings (max versions, check-and-set) are stored by the engine at `<mount>/config`, so the policy only covers them on `secret/`. Creating another KV store with settings mounts it and then fails to save them; EnvBao tells you the store exists, and you can add `<mount>/config` to the policy and use **Settings**.
+- If your KV v2 mount is not `secret/`, change `secret/metadata/*` and `secret/config`. The dynamic-engine rules name the default mounts (`database/`, `aws/`, `ssh/`), so change those too, or repeat a block for each mount. They deliberately avoid a `+/roles/*` wildcard, which would also match system paths such as `sys/config/cors`.
 - Listing leases and revoking by prefix need `sudo` in OpenBao (looking up, renewing and revoking a single lease do not). Without it the Leases tab shows a permission error.
 - The `creds`, `sign` and `static-creds` lines let this account issue live database logins, AWS keys and SSH certificates. Remove them if the account should manage roles without being able to use them.
 - The account can create policies and attach them to identities, which is effectively the power to grant access to anything. Treat it as an administrator.
@@ -252,7 +261,7 @@ BAO_ADDR=http://127.0.0.1:8200 BAO_TOKEN=root npm run test:integration   # again
 
 The integration tests need a dev server with userpass available (they enable it if missing) and a KV v2 mount at `secret/` (the dev-mode default). They create and delete their own uniquely named objects, but run them against a throwaway instance, not a real one.
 
-The dynamic-engine tests mount their own `ssh` engine (built into OpenBao). The database tests are skipped unless `BAO_PG_URL` points at a Postgres whose user has `CREATEROLE`, as seen from OpenBao, for example `BAO_PG_URL='postgresql://postgres:secret@postgres:5432/app?sslmode=disable'`; CI starts one as a service, and `docker compose up -d postgres` gives you one on `127.0.0.1:5433`. The admin-policy tests use the default `ssh/` and `database/` mounts and skip those checks when the mount already exists, so they never overwrite a real CA or connection. The AWS engine tests skip when the server does not have it.
+The dynamic-engine and mount-management tests mount and unmount their own uniquely named engines (`ssh` and `kv` are built into OpenBao). The database tests are skipped unless `BAO_PG_URL` points at a Postgres whose user has `CREATEROLE`, as seen from OpenBao, for example `BAO_PG_URL='postgresql://postgres:secret@postgres:5432/app?sslmode=disable'`; CI starts one as a service, and `docker compose up -d postgres` gives you one on `127.0.0.1:5433`. The admin-policy tests use the default `ssh/` and `database/` mounts and skip those checks when the mount already exists, so they never overwrite a real CA or connection. The AWS engine tests skip when the server does not have it.
 
 Some test files enable `userpass` at the same time, which can fail with `path is already in use at userpass/`. If that happens, add `-- --no-file-parallelism`.
 
@@ -262,6 +271,7 @@ CI runs on Gitea Actions (`.gitea/workflows/ci.yml`): lint, test and build, plus
 
 - **Browser-direct**: CORS must be enabled on OpenBao, and the token lives in the browser's memory (never written to storage). There is no server-side audit trail beyond OpenBao's own audit log.
 - **Scope**: KV v2 and the database, AWS and SSH dynamic engines (other engine types get a raw JSON role editor only, with no credential generation), and only userpass auth, tokens and identity entities/groups are managed. KV v1 is not shown.
+- **Mount management**: a mount's path and type can't be changed, and there is no rename (OpenBao's remount revokes leases and would leave grants pointing at the old path). Only KV v2, database, AWS and SSH can be created; KV v1 is not upgraded. Deleting a mount leaves policies that mention it in place.
 - **Credentials**: dynamic credentials appear once, in the browser, when generated; copy them then. Avoid generating them on a shared screen. Credentials without a lease (database static roles) cannot be revoked from the Leases tab.
 - **Managed policies**: access is granted by writing one policy per user, entity or group, named `envbao-<kind>-<name>` (for example `envbao-user-alice`). If a managed policy is edited outside EnvBao (for example to add parameter constraints) it becomes read-only in the UI rather than being overwritten. All other policies are shown read-only. Policy names are lower-cased by OpenBao, so identities whose names differ only by case or punctuation would collide; EnvBao detects this and refuses to overwrite.
 - **Tokens**: cannot be granted access after creation (OpenBao fixes a token's policies when it is created), so choose their policies when creating them. Tokens created by a token die with it unless created as orphans.

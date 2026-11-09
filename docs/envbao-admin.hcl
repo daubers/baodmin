@@ -26,6 +26,12 @@ path "auth/token/revoke-accessor" { capabilities = ["update"] }
 # Discovery: mounted auth methods and secrets engines, and KV v2 metadata for the secret browser
 path "sys/auth"            { capabilities = ["read"] }
 path "sys/mounts"          { capabilities = ["read"] }
+
+# Secrets engine mounts: create, change (tune) and delete. Deleting a mount destroys everything in it
+# and revokes its leases, so this is a powerful rule; leave it out if mounts are managed elsewhere.
+path "sys/mounts/*"        { capabilities = ["create", "read", "update", "delete"] }
+# KV v2 settings (max versions, check-and-set) of the KV mount
+path "secret/config"       { capabilities = ["read", "update"] }
 path "secret/metadata/*"   { capabilities = ["list"] }
 
 # Dynamic secrets engines: roles, config, credentials and leases. The paths use the default mount
