@@ -1,18 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { BaoClient } from '../../api/bao'
-import { engineFor, mountKind } from '../../api/engines/registry'
+import { engineFor, mountKind, mountTypeFor } from '../../api/engines/registry'
 import { listSecrets } from '../../api/secrets'
 import { RequireConnection } from '../shared/RequireConnection'
 import { useMounts } from '../shared/useMounts'
 import { AccessPanel } from './AccessPanel'
 import { EngineView } from './EngineView'
+import { MountDialog } from './MountDialog'
 
 function Browser({ client }: { client: BaoClient }) {
   const mounts = useMounts(client)
   const [mountChoice, setMount] = useState<string | null>(null)
   const [prefix, setPrefix] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<'create' | 'edit' | null>(null)
 
   const current = mounts.data?.find((m) => m.path === mountChoice) ?? mounts.data?.[0] ?? null
   const mount = current?.path ?? null
@@ -31,7 +33,49 @@ function Browser({ client }: { client: BaoClient }) {
 
   if (mounts.error) return <p role="alert">{mounts.error.message}</p>
   if (mounts.isPending) return <p>Loading…</p>
-  if (!current || !mount) return <p>No secrets engines are mounted.</p>
+
+  const existing = mounts.data.map((m) => m.path)
+  const closeDialog = () => setDialog(null)
+  const manage = (
+    <div className="mount-actions">
+      <button type="button" onClick={() => setDialog(dialog === 'create' ? null : 'create')} aria-expanded={dialog === 'create'}>
+        New secrets engine
+      </button>
+      {current && mountTypeFor(current) && (
+        <button type="button" onClick={() => setDialog(dialog === 'edit' ? null : 'edit')} aria-expanded={dialog === 'edit'}>
+          Settings
+        </button>
+      )}
+    </div>
+  )
+  const dialogs = dialog && (
+    <MountDialog
+      // Remount per mount so one mount's settings are never shown (or saved) for another.
+      key={dialog === 'edit' ? current?.path : 'create'}
+      client={client}
+      existing={existing}
+      mount={dialog === 'edit' && current ? current : undefined}
+      onClose={closeDialog}
+      onDone={(path) => {
+        closeDialog()
+        // A new mount starts at its root; saving settings keeps your place.
+        if (path !== mount) {
+          setMount(path)
+          go('')
+        }
+      }}
+    />
+  )
+
+  if (!current || !mount) {
+    return (
+      <>
+        <p>No secrets engines are mounted.</p>
+        {manage}
+        {dialogs}
+      </>
+    )
+  }
 
   const where = prefix ? `${mount}${prefix}` : mount
   const kv = mounts.data.filter((m) => mountKind(m) === 'kv')
@@ -66,58 +110,66 @@ function Browser({ client }: { client: BaoClient }) {
 
   if (!isKv) {
     return (
-      <div className="secrets-layout">
-        <div className="secrets-browser">
-          <nav aria-label="Path" className="crumbs">
-            {mountSelect}
-          </nav>
+      <>
+        {manage}
+        {dialogs}
+        <div className="secrets-layout">
+          <div className="secrets-browser">
+            <nav aria-label="Path" className="crumbs">
+              {mountSelect}
+            </nav>
+          </div>
+          <EngineView client={client} mount={current} />
         </div>
-        <EngineView client={client} mount={current} />
-      </div>
+      </>
     )
   }
 
   return (
-    <div className="secrets-layout">
-      <div className="secrets-browser">
-        <nav aria-label="Path" className="crumbs">
-          {mountSelect}
-          <button type="button" onClick={() => go('')}>
-            {mount}
-          </button>
-          {crumbs.map((c, i) => (
-            <button key={i} type="button" onClick={() => go(crumbs.slice(0, i + 1).join('/') + '/')}>
-              {c}/
+    <>
+      {manage}
+      {dialogs}
+      <div className="secrets-layout">
+        <div className="secrets-browser">
+          <nav aria-label="Path" className="crumbs">
+            {mountSelect}
+            <button type="button" onClick={() => go('')}>
+              {mount}
             </button>
-          ))}
-        </nav>
-        {entries.isPending && <p className="hint">Loading…</p>}
-        {entries.error && <p role="alert">{entries.error.message}</p>}
-        {entries.data?.length === 0 && <p className="hint">No secrets in {where} yet.</p>}
-        {!!entries.data?.length && (
-          <ul className="entries" aria-label={`Contents of ${where}`}>
-            {entries.data.map((e) => (
-              <li key={e.path}>
-                <button
-                  type="button"
-                  className={e.isFolder ? 'entry-folder' : undefined}
-                  aria-pressed={e.isFolder ? undefined : selected === e.path}
-                  onClick={() => (e.isFolder ? go(e.path) : setSelected(e.path))}
-                >
-                  {e.name}
-                  {e.isFolder && <span aria-hidden="true">›</span>}
-                </button>
-              </li>
+            {crumbs.map((c, i) => (
+              <button key={i} type="button" onClick={() => go(crumbs.slice(0, i + 1).join('/') + '/')}>
+                {c}/
+              </button>
             ))}
-          </ul>
+          </nav>
+          {entries.isPending && <p className="hint">Loading…</p>}
+          {entries.error && <p role="alert">{entries.error.message}</p>}
+          {entries.data?.length === 0 && <p className="hint">No secrets in {where} yet.</p>}
+          {!!entries.data?.length && (
+            <ul className="entries" aria-label={`Contents of ${where}`}>
+              {entries.data.map((e) => (
+                <li key={e.path}>
+                  <button
+                    type="button"
+                    className={e.isFolder ? 'entry-folder' : undefined}
+                    aria-pressed={e.isFolder ? undefined : selected === e.path}
+                    onClick={() => (e.isFolder ? go(e.path) : setSelected(e.path))}
+                  >
+                    {e.name}
+                    {e.isFolder && <span aria-hidden="true">›</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {selected ? (
+          <AccessPanel key={`${mount}${selected}`} client={client} mount={mount} secret={selected} />
+        ) : (
+          <p className="secret-placeholder">Select a secret to see who can reach it.</p>
         )}
       </div>
-      {selected ? (
-        <AccessPanel key={`${mount}${selected}`} client={client} mount={mount} secret={selected} />
-      ) : (
-        <p className="secret-placeholder">Select a secret to see who can reach it.</p>
-      )}
-    </div>
+    </>
   )
 }
 

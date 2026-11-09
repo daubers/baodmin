@@ -1500,3 +1500,18 @@ button.danger-solid:hover:not(:disabled) {
   font-family: var(--mono);
   white-space: pre-wrap;
 }
+
+/* Create / settings / delete panel for a secrets engine mount. */
+.mount-actions {
+  display: flex;
+  gap: var(--s2);
+  margin-bottom: var(--s4);
+}
+
+.mount-dialog {
+  margin: 0 0 var(--s4);
+  padding: var(--s4);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}

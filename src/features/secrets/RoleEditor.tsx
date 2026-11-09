@@ -97,6 +97,7 @@ export function RoleEditor({
   kind,
   noun = 'role',
   showName = true,
+  nameLabel,
   submitLabel = 'Save',
   draft,
   pending,
@@ -110,6 +111,8 @@ export function RoleEditor({
   noun?: string
   /** False for single-endpoint configs that have no name. */
   showName?: boolean
+  /** Label for the name field; defaults to "<Noun> name". */
+  nameLabel?: string
   submitLabel?: string
   draft: RoleDraft
   pending: boolean
@@ -128,7 +131,7 @@ export function RoleEditor({
       <h3>{title}</h3>
       {showName && (
         <label>
-          {noun[0].toUpperCase() + noun.slice(1)} name
+          {nameLabel ?? `${noun[0].toUpperCase() + noun.slice(1)} name`}
           <input value={draft.name} disabled={!draft.isNew} onChange={(e) => onChange({ ...draft, name: e.target.value })} required />
         </label>
       )}

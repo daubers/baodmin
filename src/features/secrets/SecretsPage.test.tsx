@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { BaoClient } from '../../api/bao'
 import * as grants from '../../api/grants'
 import * as ids from '../../api/identities'
+import * as mountsApi from '../../api/mounts'
 import * as api from '../../api/secrets'
 import { SessionProvider } from '../../api/session'
 import { useSession } from '../../api/useSession'
@@ -16,6 +17,7 @@ vi.mock('../../api/grants')
 vi.mock('../../api/identities')
 vi.mock('../../api/secrets', async (orig) => ({ ...(await orig<typeof api>()), listMounts: vi.fn(), listSecrets: vi.fn(), readPolicyHcl: vi.fn() }))
 vi.mock('../../api/tokens')
+vi.mock('../../api/mounts', async (orig) => ({ ...(await orig<typeof mountsApi>()), createMount: vi.fn(), tuneMount: vi.fn(), readKvConfig: vi.fn() }))
 
 const client = new BaoClient('http://b', 't')
 
@@ -155,6 +157,61 @@ test('groups mounts by engine and shows the engine view for a dynamic mount', as
   expect(await screen.findByRole('heading', { name: /Database · database\// })).toBeInTheDocument()
   expect(await screen.findByRole('button', { name: 'New role' })).toBeInTheDocument()
   expect(api.listSecrets).not.toHaveBeenCalled()
+})
+
+async function openPage() {
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <SessionProvider>
+        <MemoryRouter>
+          <Connected />
+          <SecretsPage />
+        </MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  )
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'go' }))
+  return user
+}
+
+test('a server with no engines can still create its first one', async () => {
+  vi.mocked(api.listMounts).mockResolvedValue([])
+  vi.mocked(mountsApi.createMount).mockResolvedValue()
+  const user = await openPage()
+  expect(await screen.findByText('No secrets engines are mounted.')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'New secrets engine' }))
+  await user.type(screen.getByRole('textbox', { name: 'Path' }), 'secret')
+  vi.mocked(api.listMounts).mockResolvedValue([{ path: 'secret/', type: 'kv', version: '2' }])
+  await user.click(screen.getByRole('button', { name: 'Create' }))
+  expect(mountsApi.createMount).toHaveBeenCalled()
+  expect(await screen.findByRole('navigation', { name: 'Path' })).toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: 'New secrets engine' })).not.toBeInTheDocument()
+})
+
+test('creating an engine selects it', async () => {
+  vi.mocked(mountsApi.createMount).mockResolvedValue()
+  const user = await openPage()
+  await user.click(await screen.findByRole('button', { name: 'New secrets engine' }))
+  await user.selectOptions(screen.getByLabelText('Type'), 'ssh')
+  await user.type(screen.getByRole('textbox', { name: 'Path' }), 'hosts')
+  vi.mocked(api.listMounts).mockResolvedValue([
+    { path: 'secret/', type: 'kv', version: '2' },
+    { path: 'hosts/', type: 'ssh' },
+  ])
+  vi.spyOn(BaoClient.prototype, 'list').mockResolvedValue([])
+  await user.click(screen.getByRole('button', { name: 'Create' }))
+  expect(await screen.findByRole('heading', { name: /SSH · hosts\// })).toBeInTheDocument()
+  expect(screen.getByLabelText('Mount')).toHaveValue('hosts/')
+})
+
+test('Settings opens the selected mount\'s settings, and toggles closed', async () => {
+  vi.mocked(mountsApi.readKvConfig).mockResolvedValue({ max_versions: 0, cas_required: false, delete_version_after: '0s' })
+  const user = await openPage()
+  await user.click(await screen.findByRole('button', { name: 'Settings' }))
+  expect(await screen.findByRole('region', { name: 'Settings for secret/' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Settings' }))
+  expect(screen.queryByRole('region', { name: 'Settings for secret/' })).not.toBeInTheDocument()
 })
 
 test('asks to connect first', () => {
