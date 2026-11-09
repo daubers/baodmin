@@ -5,5 +5,7 @@ export default defineConfig({
   test: {
     include: ['src/**/*.integration.test.ts'],
     testTimeout: 15000,
+    // The files share one OpenBao and one Postgres: concurrent role creation fails with "tuple concurrently updated".
+    fileParallelism: false,
   },
 })
