@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { BaoClient } from '../../api/bao'
@@ -93,5 +93,43 @@ test('ssh CA: shows the public key and generating asks first', async () => {
 test('shows the load error', async () => {
   vi.mocked(config.listConfigs).mockRejectedValue(new Error('permission denied'))
   renderPanel('database')
+  expect(await screen.findByRole('alert')).toHaveTextContent('permission denied')
+})
+
+test('the connections table shows each connection\'s URL and allowed roles, hiding literal passwords', async () => {
+  vi.mocked(config.listConfigs).mockResolvedValue(['main', 'legacy', 'bare'])
+  vi.mocked(config.readConfig).mockImplementation(async (_c, _m, _k, name) =>
+    name === 'main'
+      ? { connection_url: 'postgresql://{{username}}:{{password}}@db:5432/app', allowed_roles: ['readonly', 'readwrite'] }
+      : name === 'legacy'
+        ? { connection_url: 'postgresql://bao:hunter2@old:5432/app', allowed_roles: ['*'] }
+        : { allowed_roles: [] },
+  )
+  renderPanel('database')
+  const table = await screen.findByRole('table', { name: 'Connections' })
+  expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Name', 'Connection URL', 'Allowed roles', ''])
+
+  const main = (await within(table).findByText('main')).closest('tr')!
+  expect(await within(main).findByText('postgresql://{{username}}:{{password}}@db:5432/app')).toBeInTheDocument()
+  expect(within(main).getByText('readonly')).toBeInTheDocument()
+  expect(within(main).getByText('readwrite')).toBeInTheDocument()
+
+  const legacy = within(table).getByText('legacy').closest('tr')!
+  expect(await within(legacy).findByText('postgresql://bao:••••@old:5432/app')).toBeInTheDocument()
+  expect(table).not.toHaveTextContent('hunter2')
+  expect(within(legacy).getByText('*')).toBeInTheDocument()
+
+  const bare = within(table).getByText('bare').closest('tr')!
+  expect((await within(bare).findAllByText('None')).length).toBe(2)
+})
+
+test('a connection that cannot be read says why, without hiding the others', async () => {
+  vi.mocked(config.listConfigs).mockResolvedValue(['ok', 'broken'])
+  vi.mocked(config.readConfig).mockImplementation(async (_c, _m, _k, name) => {
+    if (name === 'broken') throw new Error('permission denied')
+    return { connection_url: 'postgresql://db/app', allowed_roles: ['ro'] }
+  })
+  renderPanel('database')
+  expect(await screen.findByText('postgresql://db/app')).toBeInTheDocument()
   expect(await screen.findByRole('alert')).toHaveTextContent('permission denied')
 })

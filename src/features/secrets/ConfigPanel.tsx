@@ -4,7 +4,9 @@ import type { BaoClient } from '../../api/bao'
 import { deleteConfig, listConfigs, readConfig, runAction, writeConfig } from '../../api/engines/config'
 import type { ConfigKind, EngineDef } from '../../api/engines/registry'
 import { draftFromRole, emptyDraft, payloadFromDraft, type RoleData, type RoleDraft } from '../../api/engines/roles'
+import { maskConnectionUrl } from '../../model/connectionUrl'
 import { ListState } from '../shared/ListState'
+import { NameChips } from '../shared/PolicyChips'
 import { useConfirm } from '../shared/useConfirm'
 import { RoleEditor } from './RoleEditor'
 
@@ -122,6 +124,41 @@ function SingleConfig({ client, mount, kind }: { client: BaoClient; mount: strin
   )
 }
 
+/** One connection in the list: its URL and the roles allowed to use it, read from the connection itself. */
+function ConnectionRow({ client, mount, kind, name, onEdit }: {
+  client: BaoClient
+  mount: string
+  kind: ConfigKind
+  name: string
+  onEdit: () => void
+}) {
+  const cfg = useQuery({ queryKey: ['engine-config', mount, kind.id, name], queryFn: () => readConfig(client, mount, kind, name) })
+  const url = cfg.data?.connection_url
+  const roles = Array.isArray(cfg.data?.allowed_roles) ? (cfg.data.allowed_roles as string[]) : []
+  return (
+    <tr>
+      <td>{name}</td>
+      <td data-label="Connection URL">
+        {cfg.isPending ? (
+          <span className="hint">Loading…</span>
+        ) : cfg.error ? (
+          <span role="alert">{cfg.error.message}</span>
+        ) : typeof url === 'string' && url ? (
+          <code>{maskConnectionUrl(url)}</code>
+        ) : (
+          <span className="hint">None</span>
+        )}
+      </td>
+      <td data-label="Allowed roles">{cfg.data ? <NameChips names={roles} /> : null}</td>
+      <td>
+        <button type="button" aria-label={`Edit ${name}`} onClick={onEdit}>
+          Edit
+        </button>
+      </td>
+    </tr>
+  )
+}
+
 function NamedConfigs({ client, mount, kind }: { client: BaoClient; mount: string; kind: ConfigKind }) {
   const [editing, setEditing] = useState<{ name?: string; initial: RoleData | null } | null>(null)
   const names = useQuery({ queryKey: ['engine-config', mount, kind.id], queryFn: () => listConfigs(client, mount, kind) })
@@ -137,19 +174,14 @@ function NamedConfigs({ client, mount, kind }: { client: BaoClient; mount: strin
           <thead>
             <tr>
               <th>Name</th>
+              <th>Connection URL</th>
+              <th>Allowed roles</th>
               <th />
             </tr>
           </thead>
           <tbody>
             {names.data.map((n) => (
-              <tr key={n}>
-                <td>{n}</td>
-                <td>
-                  <button type="button" aria-label={`Edit ${n}`} onClick={() => open.mutate(n)}>
-                    Edit
-                  </button>
-                </td>
-              </tr>
+              <ConnectionRow key={n} client={client} mount={mount} kind={kind} name={n} onEdit={() => open.mutate(n)} />
             ))}
           </tbody>
         </table>
