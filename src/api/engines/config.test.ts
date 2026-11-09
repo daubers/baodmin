@@ -2,7 +2,6 @@ import { expect, test, vi } from 'vitest'
 import { BaoClient, BaoError } from '../bao'
 import { deleteConfig, listConfigs, readConfig, runAction, writeConfig } from './config'
 import { generateCreds } from './creds'
-import { revokeLease } from './leases'
 import { ENGINES } from './registry'
 import { draftFromRole, emptyDraft, payloadFromDraft } from './roles'
 
@@ -73,11 +72,4 @@ test('credential requests: POST sends inputs, result is normalised', async () =>
   const dbCreds = ENGINES.database.roleKinds[0].creds[0]
   await generateCreds(c, 'database/', dbCreds, 'ro', { ignored: true })
   expect(req).toHaveBeenLastCalledWith('GET', 'database/creds/ro', undefined)
-})
-
-test('revoking a lease', async () => {
-  const c = new BaoClient('http://b', 't')
-  const req = vi.spyOn(c, 'request').mockResolvedValue(undefined)
-  await revokeLease(c, 'database/creds/ro/xyz')
-  expect(req).toHaveBeenCalledWith('PUT', 'sys/leases/revoke', { lease_id: 'database/creds/ro/xyz' })
 })

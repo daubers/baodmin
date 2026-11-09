@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { BaoClient } from '../bao'
 import { readConfig, runAction, writeConfig, deleteConfig } from './config'
 import { generateCreds } from './creds'
-import { revokeLease } from './leases'
+import { listLeases, lookupLease, renewLease, revokeLease, revokePrefix } from './leases'
 import { listMounts } from '../secrets'
 import { ENGINES } from './registry'
 import { deleteRole, draftFromRole, emptyDraft, listRoles, payloadFromDraft, readRole, writeRole } from './roles'
@@ -97,6 +97,26 @@ describe('dynamic engine config and credentials', () => {
     expect(out.leaseId).toContain('/creds/otp/')
     expect(out.data.key).toBeTruthy()
     await revokeLease(client, out.leaseId)
+  })
+
+  test('leases can be browsed, inspected, renewed and revoked by prefix', async () => {
+    const a = await generateCreds(client, mount, kind.creds[1], 'otp', { ip: '10.1.2.3' })
+    const b = await generateCreds(client, mount, kind.creds[1], 'otp', { ip: '10.1.2.4' })
+
+    // folders first: mount -> creds/ -> otp/ -> lease ids
+    expect(await listLeases(client, mount)).toContainEqual({ name: 'creds/', path: `${mount}creds/`, isFolder: true })
+    const ids = (await listLeases(client, `${mount}creds/otp/`)).map((e) => e.path)
+    expect(ids).toEqual(expect.arrayContaining([a.leaseId, b.leaseId]))
+
+    const info = await lookupLease(client, a.leaseId)
+    expect(info.id).toBe(a.leaseId)
+    expect(info.ttl).toBeGreaterThan(0)
+    expect(info.renewable).toBe(false)
+    // OTP leases are not renewable, and the UI only offers Renew when renewable; OpenBao says so itself
+    await expect(renewLease(client, a.leaseId)).rejects.toThrow()
+
+    await revokePrefix(client, `${mount}creds/otp/`)
+    expect(await listLeases(client, `${mount}creds/otp/`)).toEqual([])
   })
 
   test('single-endpoint config round-trips (aws lease)', async (ctx) => {

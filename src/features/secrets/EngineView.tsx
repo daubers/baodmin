@@ -3,16 +3,18 @@ import type { BaoClient } from '../../api/bao'
 import { engineFor } from '../../api/engines/registry'
 import type { Mount } from '../../api/secrets'
 import { ConfigPanel } from './ConfigPanel'
+import { LeasesPanel } from './LeasesPanel'
 import { RolesPanel } from './RolesPanel'
 
-type Tab = 'roles' | 'config'
+type Tab = 'roles' | 'config' | 'leases'
 
-/** Roles and Config (and, in a later phase, Leases) for a dynamic secrets engine. */
+/** Roles, Config and Leases for a dynamic secrets engine. */
 export function EngineView({ client, mount }: { client: BaoClient; mount: Mount }) {
   const engine = engineFor(mount.type)
   const [tab, setTab] = useState<Tab>('roles')
   const tabs: { id: Tab; label: string }[] = [{ id: 'roles', label: 'Roles' }]
   if (engine.configs.length > 0) tabs.push({ id: 'config', label: 'Config' })
+  tabs.push({ id: 'leases', label: 'Leases' })
   const current = tabs.some((t) => t.id === tab) ? tab : 'roles'
 
   return (
@@ -30,6 +32,7 @@ export function EngineView({ client, mount }: { client: BaoClient; mount: Mount 
         </div>
       )}
       {current === 'roles' && <RolesPanel key={mount.path} client={client} mount={mount.path} engine={engine} />}
+      {current === 'leases' && <LeasesPanel key={mount.path} client={client} mount={mount.path} />}
       {current === 'config' && <ConfigPanel key={mount.path} client={client} mount={mount.path} engine={engine} />}
     </div>
   )
