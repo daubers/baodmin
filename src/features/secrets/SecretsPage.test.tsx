@@ -17,7 +17,7 @@ vi.mock('../../api/grants')
 vi.mock('../../api/identities')
 vi.mock('../../api/secrets', async (orig) => ({ ...(await orig<typeof api>()), listMounts: vi.fn(), listSecrets: vi.fn(), readPolicyHcl: vi.fn() }))
 vi.mock('../../api/tokens')
-vi.mock('../../api/mounts', async (orig) => ({ ...(await orig<typeof mountsApi>()), createMount: vi.fn(), tuneMount: vi.fn(), readKvConfig: vi.fn() }))
+vi.mock('../../api/mounts', async (orig) => ({ ...(await orig<typeof mountsApi>()), createMount: vi.fn(), tuneMount: vi.fn(), readKvConfig: vi.fn(), deleteMount: vi.fn(), mountImpact: vi.fn() }))
 
 const client = new BaoClient('http://b', 't')
 
@@ -212,6 +212,40 @@ test('Settings opens the selected mount\'s settings, and toggles closed', async 
   expect(await screen.findByRole('region', { name: 'Settings for secret/' })).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Settings' }))
   expect(screen.queryByRole('region', { name: 'Settings for secret/' })).not.toBeInTheDocument()
+})
+
+test('deleting the selected engine falls back to another', async () => {
+  vi.mocked(api.listMounts).mockResolvedValue([
+    { path: 'secret/', type: 'kv', version: '2' },
+    { path: 'hosts/', type: 'ssh' },
+  ])
+  vi.mocked(mountsApi.mountImpact).mockResolvedValue({ kind: 'dynamic', roles: 0, hasLeases: false, unknown: [] })
+  vi.mocked(mountsApi.deleteMount).mockResolvedValue()
+  vi.spyOn(BaoClient.prototype, 'list').mockResolvedValue([])
+  const user = await openPage()
+  await user.selectOptions(await screen.findByLabelText('Mount'), 'hosts/')
+  await user.click(screen.getByRole('button', { name: 'Delete' }))
+  expect(await screen.findByRole('alertdialog', { name: 'Delete hosts/' })).toBeInTheDocument()
+  vi.mocked(api.listMounts).mockResolvedValue([{ path: 'secret/', type: 'kv', version: '2' }])
+  await user.type(screen.getByLabelText(/Type/), 'hosts')
+  await user.click(screen.getByRole('button', { name: 'Delete forever' }))
+  expect(mountsApi.deleteMount).toHaveBeenCalledWith(client, 'hosts/')
+  expect(await screen.findByRole('button', { name: 'secret/' })).toBeInTheDocument()
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+})
+
+test('switching mounts closes an open delete panel', async () => {
+  vi.mocked(api.listMounts).mockResolvedValue([
+    { path: 'secret/', type: 'kv', version: '2' },
+    { path: 'hosts/', type: 'ssh' },
+  ])
+  vi.mocked(mountsApi.mountImpact).mockResolvedValue({ kind: 'kv', topLevelEntries: 0, unknown: [] })
+  vi.spyOn(BaoClient.prototype, 'list').mockResolvedValue([])
+  const user = await openPage()
+  await user.click(await screen.findByRole('button', { name: 'Delete' }))
+  expect(await screen.findByRole('alertdialog', { name: 'Delete secret/' })).toBeInTheDocument()
+  await user.selectOptions(screen.getByLabelText('Mount'), 'hosts/')
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
 })
 
 test('asks to connect first', () => {

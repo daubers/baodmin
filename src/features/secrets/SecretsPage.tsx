@@ -6,6 +6,7 @@ import { listSecrets } from '../../api/secrets'
 import { RequireConnection } from '../shared/RequireConnection'
 import { useMounts } from '../shared/useMounts'
 import { AccessPanel } from './AccessPanel'
+import { DeleteMountDialog } from './DeleteMountDialog'
 import { EngineView } from './EngineView'
 import { MountDialog } from './MountDialog'
 
@@ -14,7 +15,7 @@ function Browser({ client }: { client: BaoClient }) {
   const [mountChoice, setMount] = useState<string | null>(null)
   const [prefix, setPrefix] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
-  const [dialog, setDialog] = useState<'create' | 'edit' | null>(null)
+  const [dialog, setDialog] = useState<'create' | 'edit' | 'delete' | null>(null)
 
   const current = mounts.data?.find((m) => m.path === mountChoice) ?? mounts.data?.[0] ?? null
   const mount = current?.path ?? null
@@ -46,9 +47,27 @@ function Browser({ client }: { client: BaoClient }) {
           Settings
         </button>
       )}
+      {current && (
+        <button type="button" onClick={() => setDialog(dialog === 'delete' ? null : 'delete')} aria-expanded={dialog === 'delete'}>
+          Delete
+        </button>
+      )}
     </div>
   )
-  const dialogs = dialog && (
+  const dialogs = dialog === 'delete' && current ? (
+    <DeleteMountDialog
+      key={current.path}
+      client={client}
+      mount={current}
+      onClose={closeDialog}
+      onDeleted={() => {
+        closeDialog()
+        // Fall back to the first remaining mount.
+        setMount(null)
+        go('')
+      }}
+    />
+  ) : dialog && dialog !== 'delete' && (
     <MountDialog
       // Remount per mount so one mount's settings are never shown (or saved) for another.
       key={dialog === 'edit' ? current?.path : 'create'}
@@ -87,6 +106,8 @@ function Browser({ client }: { client: BaoClient }) {
       onChange={(e) => {
         setMount(e.target.value)
         go('')
+        // A settings or delete panel belongs to the mount it was opened for.
+        setDialog(null)
       }}
     >
       {kv.length > 0 && (
