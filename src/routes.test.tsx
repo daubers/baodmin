@@ -22,7 +22,7 @@ test.each([
   expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
 })
 
-test('redirects / to identities', () => {
+test('redirects / to the connect page while signed out', () => {
   const router = createMemoryRouter(routes, { initialEntries: ['/'] })
   render(
     <Providers>
@@ -31,5 +31,6 @@ test('redirects / to identities', () => {
       </SessionProvider>
     </Providers>,
   )
-  expect(screen.getByRole('heading', { name: 'Identities' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Connect' })).toBeInTheDocument()
+  expect(router.state.location.pathname).toBe('/connect')
 })

@@ -21,11 +21,13 @@ export function Layout() {
       </a>
       <nav aria-label="Main">
         <strong>EnvBao</strong>
-        {links.map((l) => (
-          <NavLink key={l.to} to={l.to}>
-            {l.label}
-          </NavLink>
-        ))}
+        {/* Every page needs a connection, so signed out there is nothing to navigate to but Connect. */}
+        {client &&
+          links.map((l) => (
+            <NavLink key={l.to} to={l.to}>
+              {l.label}
+            </NavLink>
+          ))}
         {client ? (
           // Signed in: the name is the way back to the connection details and Disconnect.
           <NavLink to="/connect" className="whoami" title="Connection details and sign out">

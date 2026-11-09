@@ -148,7 +148,7 @@ test('groups mounts by engine and shows the engine view for a dynamic mount', as
   )
   const user = userEvent.setup()
   await user.click(screen.getByRole('button', { name: 'go' }))
-  const select = await screen.findByLabelText('Mount')
+  const select = await screen.findByLabelText('Secrets engine')
   expect(within(select).getByRole('group', { name: 'KV' })).toBeInTheDocument()
   expect(within(select).getByRole('group', { name: 'Database' })).toBeInTheDocument()
   expect(within(select).queryByText('cubbyhole/')).not.toBeInTheDocument()
@@ -202,7 +202,7 @@ test('creating an engine selects it', async () => {
   vi.spyOn(BaoClient.prototype, 'list').mockResolvedValue([])
   await user.click(screen.getByRole('button', { name: 'Create' }))
   expect(await screen.findByRole('heading', { name: /SSH · hosts\// })).toBeInTheDocument()
-  expect(screen.getByLabelText('Mount')).toHaveValue('hosts/')
+  expect(screen.getByLabelText('Secrets engine')).toHaveValue('hosts/')
 })
 
 test('Settings opens the selected mount\'s settings, and toggles closed', async () => {
@@ -223,7 +223,7 @@ test('deleting the selected engine falls back to another', async () => {
   vi.mocked(mountsApi.deleteMount).mockResolvedValue()
   vi.spyOn(BaoClient.prototype, 'list').mockResolvedValue([])
   const user = await openPage()
-  await user.selectOptions(await screen.findByLabelText('Mount'), 'hosts/')
+  await user.selectOptions(await screen.findByLabelText('Secrets engine'), 'hosts/')
   await user.click(screen.getByRole('button', { name: 'Delete' }))
   expect(await screen.findByRole('alertdialog', { name: 'Delete hosts/' })).toBeInTheDocument()
   vi.mocked(api.listMounts).mockResolvedValue([{ path: 'secret/', type: 'kv', version: '2' }])
@@ -244,8 +244,40 @@ test('switching mounts closes an open delete panel', async () => {
   const user = await openPage()
   await user.click(await screen.findByRole('button', { name: 'Delete' }))
   expect(await screen.findByRole('alertdialog', { name: 'Delete secret/' })).toBeInTheDocument()
-  await user.selectOptions(screen.getByLabelText('Mount'), 'hosts/')
+  await user.selectOptions(screen.getByLabelText('Secrets engine'), 'hosts/')
   expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+})
+
+test('lays out New, then the labelled engine picker with Settings and Delete, then the breadcrumbs', async () => {
+  await openPage()
+  const newButton = await screen.findByRole('button', { name: 'New secrets engine' })
+  const select = screen.getByLabelText('Secrets engine') // a single engine still gets its picker, so the bar looks the same
+  const settings = screen.getByRole('button', { name: 'Settings' })
+  const del = screen.getByRole('button', { name: 'Delete' })
+  const crumbs = screen.getByRole('navigation', { name: 'Path' })
+
+  // Settings and Delete share the picker's line
+  const bar = select.closest('.mount-bar')!
+  expect(bar).toContainElement(settings)
+  expect(bar).toContainElement(del)
+  expect(bar).not.toContainElement(newButton)
+  expect(bar).not.toContainElement(crumbs)
+
+  // top to bottom: New, the bar, then the breadcrumbs
+  const before = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+  expect(before(newButton, select)).toBe(true)
+  expect(before(bar, crumbs)).toBe(true)
+  expect(screen.getByRole('button', { name: 'secret/' }).closest('nav')).toBe(crumbs)
+})
+
+test('a dynamic engine uses the full width, with the same header', async () => {
+  vi.mocked(api.listMounts).mockResolvedValue([{ path: 'hosts/', type: 'ssh' }])
+  vi.spyOn(BaoClient.prototype, 'list').mockResolvedValue([])
+  await openPage()
+  expect(await screen.findByLabelText('Secrets engine')).toHaveValue('hosts/')
+  expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
+  expect(screen.queryByRole('navigation', { name: 'Path' })).not.toBeInTheDocument()
+  expect(document.querySelector('.secrets-layout')).toBeNull()
 })
 
 test('asks to connect first', () => {

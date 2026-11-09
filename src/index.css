@@ -1095,14 +1095,6 @@ button.link:hover:not(:disabled) {
   align-items: start;
 }
 
-.secrets-browser .crumbs {
-  margin-top: 0;
-}
-
-.secrets-browser .crumbs select {
-  min-width: 0;
-}
-
 .secrets-browser .entries {
   max-height: 70vh;
   overflow-y: auto;
@@ -1501,11 +1493,44 @@ button.danger-solid:hover:not(:disabled) {
   white-space: pre-wrap;
 }
 
-/* Create / settings / delete panel for a secrets engine mount. */
+/* Top of the Secrets page: New, then the engine picker with its actions, then (KV) the breadcrumbs. */
+.mount-new {
+  margin-bottom: var(--s4);
+}
+
+.mount-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+  margin-bottom: var(--s2);
+}
+
+.mount-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.mount-pick label {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.mount-pick select {
+  min-width: 12rem;
+  max-width: 100%;
+}
+
 .mount-actions {
   display: flex;
   gap: var(--s2);
-  margin-bottom: var(--s4);
+}
+
+.mount-bar + .crumbs,
+.mount-dialog + .crumbs {
+  margin-top: var(--s2);
 }
 
 .mount-dialog {

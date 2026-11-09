@@ -121,3 +121,11 @@ test('shows an empty state and the load error', async () => {
   renderPanel('ssh')
   expect(await screen.findByText('No roles yet.')).toBeInTheDocument()
 })
+
+test('yes/no settings lay the box beside its text (the "check" label), not stacked above it', async () => {
+  renderPanel('ssh')
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: 'New role' }))
+  const box = screen.getByLabelText('Allow user certificates')
+  expect(box.closest('label')).toHaveClass('check')
+})

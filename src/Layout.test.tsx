@@ -40,6 +40,16 @@ test('offers Connect only while signed out', async () => {
   expect(screen.queryByRole('link', { name: 'Connection' })).not.toBeInTheDocument()
 })
 
+test('shows the section links only while signed in', async () => {
+  const user = setup()
+  const names = ['Identities', 'Secrets', 'Graph']
+  for (const n of names) expect(screen.queryByRole('link', { name: n })).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Connect' })).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'sign in' }))
+  for (const n of names) expect(screen.getByRole('link', { name: n })).toBeInTheDocument()
+})
+
 test('while signed in, the signed-in name links to the connection details', async () => {
   const user = setup()
   await user.click(screen.getByRole('button', { name: 'sign in' }))

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { BaoClient } from '../../api/bao'
 import { engineFor, mountKind, mountTypeFor } from '../../api/engines/registry'
 import { listSecrets } from '../../api/secrets'
@@ -12,6 +12,7 @@ import { MountDialog } from './MountDialog'
 
 function Browser({ client }: { client: BaoClient }) {
   const mounts = useMounts(client)
+  const selectId = useId()
   const [mountChoice, setMount] = useState<string | null>(null)
   const [prefix, setPrefix] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
@@ -37,21 +38,11 @@ function Browser({ client }: { client: BaoClient }) {
 
   const existing = mounts.data.map((m) => m.path)
   const closeDialog = () => setDialog(null)
-  const manage = (
-    <div className="mount-actions">
+  const newButton = (
+    <div className="mount-new">
       <button type="button" onClick={() => setDialog(dialog === 'create' ? null : 'create')} aria-expanded={dialog === 'create'}>
         New secrets engine
       </button>
-      {current && mountTypeFor(current) && (
-        <button type="button" onClick={() => setDialog(dialog === 'edit' ? null : 'edit')} aria-expanded={dialog === 'edit'}>
-          Settings
-        </button>
-      )}
-      {current && (
-        <button type="button" onClick={() => setDialog(dialog === 'delete' ? null : 'delete')} aria-expanded={dialog === 'delete'}>
-          Delete
-        </button>
-      )}
     </div>
   )
   const dialogs = dialog === 'delete' && current ? (
@@ -90,7 +81,7 @@ function Browser({ client }: { client: BaoClient }) {
     return (
       <>
         <p>No secrets engines are mounted.</p>
-        {manage}
+        {newButton}
         {dialogs}
       </>
     )
@@ -99,70 +90,81 @@ function Browser({ client }: { client: BaoClient }) {
   const where = prefix ? `${mount}${prefix}` : mount
   const kv = mounts.data.filter((m) => mountKind(m) === 'kv')
   const dynamic = mounts.data.filter((m) => mountKind(m) === 'dynamic')
-  const mountSelect = mounts.data.length > 1 && (
-    <select
-      aria-label="Mount"
-      value={mount}
-      onChange={(e) => {
-        setMount(e.target.value)
-        go('')
-        // A settings or delete panel belongs to the mount it was opened for.
-        setDialog(null)
-      }}
-    >
-      {kv.length > 0 && (
-        <optgroup label="KV">
-          {kv.map((m) => (
-            <option key={m.path}>{m.path}</option>
-          ))}
-        </optgroup>
-      )}
-      {[...new Set(dynamic.map((m) => m.type))].map((type) => (
-        <optgroup key={type} label={engineFor(type).label}>
-          {dynamic
-            .filter((m) => m.type === type)
-            .map((m) => (
-              <option key={m.path}>{m.path}</option>
+
+  // New engine on its own line; then the engine picker with what you can do to it; then (for KV) where you are in it.
+  const header = (
+    <>
+      {newButton}
+      <div className="mount-bar">
+        <div className="mount-pick">
+          <label htmlFor={selectId}>Secrets engine</label>
+          <select
+            id={selectId}
+            value={mount}
+            onChange={(e) => {
+              setMount(e.target.value)
+              go('')
+              // A settings or delete panel belongs to the mount it was opened for.
+              setDialog(null)
+            }}
+          >
+            {kv.length > 0 && (
+              <optgroup label="KV">
+                {kv.map((m) => (
+                  <option key={m.path}>{m.path}</option>
+                ))}
+              </optgroup>
+            )}
+            {[...new Set(dynamic.map((m) => m.type))].map((type) => (
+              <optgroup key={type} label={engineFor(type).label}>
+                {dynamic
+                  .filter((m) => m.type === type)
+                  .map((m) => (
+                    <option key={m.path}>{m.path}</option>
+                  ))}
+              </optgroup>
             ))}
-        </optgroup>
-      ))}
-    </select>
+          </select>
+        </div>
+        <div className="mount-actions">
+          {mountTypeFor(current) && (
+            <button type="button" onClick={() => setDialog(dialog === 'edit' ? null : 'edit')} aria-expanded={dialog === 'edit'}>
+              Settings
+            </button>
+          )}
+          <button type="button" onClick={() => setDialog(dialog === 'delete' ? null : 'delete')} aria-expanded={dialog === 'delete'}>
+            Delete
+          </button>
+        </div>
+      </div>
+      {dialogs}
+    </>
   )
 
   if (!isKv) {
     return (
       <>
-        {manage}
-        {dialogs}
-        <div className="secrets-layout">
-          <div className="secrets-browser">
-            <nav aria-label="Path" className="crumbs">
-              {mountSelect}
-            </nav>
-          </div>
-          <EngineView client={client} mount={current} />
-        </div>
+        {header}
+        <EngineView client={client} mount={current} />
       </>
     )
   }
 
   return (
     <>
-      {manage}
-      {dialogs}
+      {header}
+      <nav aria-label="Path" className="crumbs">
+        <button type="button" onClick={() => go('')}>
+          {mount}
+        </button>
+        {crumbs.map((c, i) => (
+          <button key={i} type="button" onClick={() => go(crumbs.slice(0, i + 1).join('/') + '/')}>
+            {c}/
+          </button>
+        ))}
+      </nav>
       <div className="secrets-layout">
         <div className="secrets-browser">
-          <nav aria-label="Path" className="crumbs">
-            {mountSelect}
-            <button type="button" onClick={() => go('')}>
-              {mount}
-            </button>
-            {crumbs.map((c, i) => (
-              <button key={i} type="button" onClick={() => go(crumbs.slice(0, i + 1).join('/') + '/')}>
-                {c}/
-              </button>
-            ))}
-          </nav>
           {entries.isPending && <p className="hint">Loading…</p>}
           {entries.error && <p role="alert">{entries.error.message}</p>}
           {entries.data?.length === 0 && <p className="hint">No secrets in {where} yet.</p>}

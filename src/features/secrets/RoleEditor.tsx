@@ -13,7 +13,8 @@ function Field({ field, value, onChange }: { field: FieldDef; value: string | bo
 
   if (field.type === 'bool') {
     return (
-      <label>
+      // "check" lays the box beside its text; a plain label in a form stacks them.
+      <label className="check">
         <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} aria-describedby={describedBy} />{' '}
         {field.label}
       </label>
