@@ -1453,3 +1453,35 @@ button.danger-solid:hover:not(:disabled) {
   border-radius: var(--radius);
   color: var(--accent);
 }
+
+/* ---------- Dynamic engines ---------- */
+
+.engine-view {
+  min-width: 0;
+}
+
+.creds-issued {
+  margin: var(--s4) 0;
+  padding: var(--s4);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.creds-issued dl {
+  margin: var(--s3) 0;
+}
+
+.creds-issued dt {
+  font-weight: 600;
+}
+
+.creds-issued dd {
+  margin: 0 0 var(--s3);
+  overflow-wrap: anywhere;
+}
+
+.creds-issued code {
+  font-family: var(--mono);
+  white-space: pre-wrap;
+}

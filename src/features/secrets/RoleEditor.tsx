@@ -1,6 +1,6 @@
 import { useId, type FormEvent } from 'react'
-import type { FieldDef, RoleKind } from '../../api/engines/registry'
-import type { RoleDraft } from '../../api/engines/roles'
+import type { FieldDef } from '../../api/engines/registry'
+import type { RoleDraft, Schema } from '../../api/engines/roles'
 
 function Field({ field, value, onChange }: { field: FieldDef; value: string | boolean; onChange: (v: string | boolean) => void }) {
   const helpId = useId()
@@ -16,6 +16,36 @@ function Field({ field, value, onChange }: { field: FieldDef; value: string | bo
       <label>
         <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} aria-describedby={describedBy} />{' '}
         {field.label}
+      </label>
+    )
+  }
+  if (field.type === 'secret') {
+    const hint = 'Write-only. Leave blank to keep the stored value.'
+    return (
+      <label>
+        {field.label}
+        {field.multiline ? (
+          <textarea
+            value={String(value)}
+            onChange={(e) => onChange(e.target.value)}
+            rows={4}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder={hint}
+            aria-describedby={describedBy}
+          />
+        ) : (
+          <input
+            type="password"
+            value={String(value)}
+            onChange={(e) => onChange(e.target.value)}
+            required={field.required}
+            autoComplete="new-password"
+            placeholder={hint}
+            aria-describedby={describedBy}
+          />
+        )}
+        {help}
       </label>
     )
   }
@@ -65,6 +95,9 @@ function Field({ field, value, onChange }: { field: FieldDef; value: string | bo
 
 export function RoleEditor({
   kind,
+  noun = 'role',
+  showName = true,
+  submitLabel = 'Save',
   draft,
   pending,
   error,
@@ -72,7 +105,12 @@ export function RoleEditor({
   onSubmit,
   onCancel,
 }: {
-  kind: RoleKind
+  kind: Schema
+  /** What is being edited, for the form title: "role", "connection", ... */
+  noun?: string
+  /** False for single-endpoint configs that have no name. */
+  showName?: boolean
+  submitLabel?: string
   draft: RoleDraft
   pending: boolean
   error: string | null
@@ -80,7 +118,7 @@ export function RoleEditor({
   onSubmit: () => void
   onCancel: () => void
 }) {
-  const title = draft.isNew ? `New ${kind.label.toLowerCase()} role` : `Edit ${draft.name}`
+  const title = draft.isNew ? `New ${noun}` : showName ? `Edit ${draft.name}` : `Edit ${noun}`
   function submit(e: FormEvent) {
     e.preventDefault()
     onSubmit()
@@ -88,10 +126,12 @@ export function RoleEditor({
   return (
     <form onSubmit={submit} aria-label={title} className="wide">
       <h3>{title}</h3>
-      <label>
-        Role name
-        <input value={draft.name} disabled={!draft.isNew} onChange={(e) => onChange({ ...draft, name: e.target.value })} required />
-      </label>
+      {showName && (
+        <label>
+          {noun[0].toUpperCase() + noun.slice(1)} name
+          <input value={draft.name} disabled={!draft.isNew} onChange={(e) => onChange({ ...draft, name: e.target.value })} required />
+        </label>
+      )}
       {kind.fields.length === 0 ? (
         <label>
           Role (JSON)
@@ -110,7 +150,7 @@ export function RoleEditor({
       {error && <p role="alert">{error}</p>}
       <div className="form-actions">
         <button type="submit" disabled={pending}>
-          Save
+          {submitLabel}
         </button>
         <button type="button" onClick={onCancel}>
           Cancel

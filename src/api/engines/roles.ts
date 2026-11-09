@@ -1,6 +1,11 @@
 import type { BaoClient } from '../bao'
 import type { FieldDef, RoleKind } from './registry'
 
+/** Anything with a field schema: a role kind, a config kind, or a credential request. */
+export interface Schema {
+  fields: FieldDef[]
+}
+
 const enc = encodeURIComponent
 
 export type RoleData = Record<string, unknown>
@@ -42,6 +47,8 @@ function fieldToDraft(f: FieldDef, v: unknown): DraftValue {
     case 'ttl':
       // OpenBao reports durations as seconds; 0 means "unset / use default".
       return typeof v === 'number' ? (v > 0 ? `${v}s` : '') : typeof v === 'string' ? v : ''
+    case 'secret':
+      return ''
     case 'list':
       return listText(v, ', ')
     case 'statements':
@@ -51,13 +58,13 @@ function fieldToDraft(f: FieldDef, v: unknown): DraftValue {
   }
 }
 
-export function emptyDraft(kind: RoleKind): RoleDraft {
+export function emptyDraft(kind: Schema): RoleDraft {
   const values: Record<string, DraftValue> = {}
   for (const f of kind.fields) values[f.key] = f.type === 'bool' ? false : f.type === 'select' ? (f.options?.[0] ?? '') : ''
   return { name: '', isNew: true, values, json: '{\n}', extras: {} }
 }
 
-export function draftFromRole(kind: RoleKind, name: string, data: RoleData): RoleDraft {
+export function draftFromRole(kind: Schema, name: string, data: RoleData): RoleDraft {
   const known = new Set(kind.fields.map((f) => f.key))
   const values: Record<string, DraftValue> = {}
   for (const f of kind.fields) values[f.key] = fieldToDraft(f, data[f.key])
@@ -77,7 +84,7 @@ const splitStatements = (s: string) =>
     .filter(Boolean)
 
 /** Request body for a role write. Throws an Error with a user-facing message for invalid input. */
-export function payloadFromDraft(kind: RoleKind, draft: RoleDraft): RoleData {
+export function payloadFromDraft(kind: Schema, draft: RoleDraft): RoleData {
   if (kind.fields.length === 0) {
     let parsed: unknown
     try {
