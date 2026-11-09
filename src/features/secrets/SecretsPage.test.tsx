@@ -133,6 +133,7 @@ test('groups mounts by engine and shows the engine view for a dynamic mount', as
     { path: 'secret/', type: 'kv', version: '2' },
     { path: 'cubbyhole/', type: 'cubbyhole' },
   ])
+  vi.spyOn(BaoClient.prototype, 'list').mockResolvedValue([])
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <SessionProvider>
@@ -151,7 +152,8 @@ test('groups mounts by engine and shows the engine view for a dynamic mount', as
   expect(within(select).queryByText('cubbyhole/')).not.toBeInTheDocument()
 
   await user.selectOptions(select, 'database/')
-  expect(await screen.findByText(/Database engine at database\//)).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: /Database · database\// })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'New role' })).toBeInTheDocument()
   expect(api.listSecrets).not.toHaveBeenCalled()
 })
 

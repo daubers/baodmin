@@ -74,7 +74,7 @@ function Browser({ client }: { client: BaoClient }) {
             {mountSelect}
           </nav>
         </div>
-        <EngineView mount={current} />
+        <EngineView client={client} mount={current} />
       </div>
     )
   }
