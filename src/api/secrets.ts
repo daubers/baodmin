@@ -14,15 +14,30 @@ export interface SecretEntry {
   isFolder: boolean
 }
 
-export async function listKvMounts(c: BaoClient): Promise<KvMount[]> {
+export interface Mount {
+  /** Mount path with trailing slash, e.g. "database/". */
+  path: string
+  /** Engine type as reported by sys/mounts, e.g. "kv", "database", "aws", "ssh". */
+  type: string
+  /** KV version ("1" | "2") when the engine is KV. */
+  version?: string
+}
+
+/** Every secrets engine mount visible to the token, sorted by path. */
+export async function listMounts(c: BaoClient): Promise<Mount[]> {
   const res = await c.request<{ data: Record<string, { type: string; options?: { version?: string } | null }> }>(
     'GET',
     'sys/mounts',
   )
   return Object.entries(res.data)
-    .filter(([, m]) => m.type === 'kv' && m.options?.version === '2')
-    .map(([path]) => ({ path }))
+    .map(([path, m]) => ({ path, type: m.type, version: m.options?.version }))
     .sort((a, b) => a.path.localeCompare(b.path))
+}
+
+export const isKvV2 = (m: Mount) => m.type === 'kv' && m.version === '2'
+
+export async function listKvMounts(c: BaoClient): Promise<KvMount[]> {
+  return (await listMounts(c)).filter(isKvV2).map(({ path }) => ({ path }))
 }
 
 /** Lists metadata only; secret values are never read. `prefix` is "" or ends with "/". */

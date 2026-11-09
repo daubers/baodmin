@@ -1,21 +1,28 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { BaoClient } from '../../api/bao'
-import { listKvMounts, listSecrets } from '../../api/secrets'
+import { engineFor, mountKind } from '../../api/engines/registry'
+import { listMounts, listSecrets } from '../../api/secrets'
 import { RequireConnection } from '../shared/RequireConnection'
 import { AccessPanel } from './AccessPanel'
+import { EngineView } from './EngineView'
 
 function Browser({ client }: { client: BaoClient }) {
-  const mounts = useQuery({ queryKey: ['kv-mounts'], queryFn: () => listKvMounts(client) })
+  const mounts = useQuery({
+    queryKey: ['mounts'],
+    queryFn: async () => (await listMounts(client)).filter((m) => mountKind(m) !== null),
+  })
   const [mountChoice, setMount] = useState<string | null>(null)
   const [prefix, setPrefix] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
 
-  const mount = mountChoice ?? mounts.data?.[0]?.path ?? null
+  const current = mounts.data?.find((m) => m.path === mountChoice) ?? mounts.data?.[0] ?? null
+  const mount = current?.path ?? null
+  const isKv = current !== null && mountKind(current) === 'kv'
   const entries = useQuery({
     queryKey: ['kv-list', mount, prefix],
     queryFn: () => listSecrets(client, mount!, prefix),
-    enabled: mount !== null,
+    enabled: isKv,
   })
 
   const crumbs = prefix.split('/').filter(Boolean)
@@ -26,28 +33,57 @@ function Browser({ client }: { client: BaoClient }) {
 
   if (mounts.error) return <p role="alert">{mounts.error.message}</p>
   if (mounts.isPending) return <p>Loading…</p>
-  if (!mount) return <p>No KV v2 secrets engines are mounted.</p>
+  if (!current || !mount) return <p>No secrets engines are mounted.</p>
 
   const where = prefix ? `${mount}${prefix}` : mount
+  const kv = mounts.data.filter((m) => mountKind(m) === 'kv')
+  const dynamic = mounts.data.filter((m) => mountKind(m) === 'dynamic')
+  const mountSelect = mounts.data.length > 1 && (
+    <select
+      aria-label="Mount"
+      value={mount}
+      onChange={(e) => {
+        setMount(e.target.value)
+        go('')
+      }}
+    >
+      {kv.length > 0 && (
+        <optgroup label="KV">
+          {kv.map((m) => (
+            <option key={m.path}>{m.path}</option>
+          ))}
+        </optgroup>
+      )}
+      {[...new Set(dynamic.map((m) => m.type))].map((type) => (
+        <optgroup key={type} label={engineFor(type).label}>
+          {dynamic
+            .filter((m) => m.type === type)
+            .map((m) => (
+              <option key={m.path}>{m.path}</option>
+            ))}
+        </optgroup>
+      ))}
+    </select>
+  )
+
+  if (!isKv) {
+    return (
+      <div className="secrets-layout">
+        <div className="secrets-browser">
+          <nav aria-label="Path" className="crumbs">
+            {mountSelect}
+          </nav>
+        </div>
+        <EngineView mount={current} />
+      </div>
+    )
+  }
 
   return (
     <div className="secrets-layout">
       <div className="secrets-browser">
         <nav aria-label="Path" className="crumbs">
-          {mounts.data.length > 1 && (
-            <select
-              aria-label="Mount"
-              value={mount}
-              onChange={(e) => {
-                setMount(e.target.value)
-                go('')
-              }}
-            >
-              {mounts.data.map((m) => (
-                <option key={m.path}>{m.path}</option>
-              ))}
-            </select>
-          )}
+          {mountSelect}
           <button type="button" onClick={() => go('')}>
             {mount}
           </button>

@@ -14,7 +14,7 @@ import { SecretsPage } from './SecretsPage'
 
 vi.mock('../../api/grants')
 vi.mock('../../api/identities')
-vi.mock('../../api/secrets', async (orig) => ({ ...(await orig<typeof api>()), listKvMounts: vi.fn(), listSecrets: vi.fn(), readPolicyHcl: vi.fn() }))
+vi.mock('../../api/secrets', async (orig) => ({ ...(await orig<typeof api>()), listMounts: vi.fn(), listSecrets: vi.fn(), readPolicyHcl: vi.fn() }))
 vi.mock('../../api/tokens')
 
 const client = new BaoClient('http://b', 't')
@@ -29,7 +29,7 @@ function Connected() {
 }
 
 beforeEach(() => {
-  vi.mocked(api.listKvMounts).mockResolvedValue([{ path: 'secret/' }])
+  vi.mocked(api.listMounts).mockResolvedValue([{ path: 'secret/', type: 'kv', version: '2' }])
   vi.mocked(api.listSecrets).mockImplementation(async (_c, _m, prefix) =>
     prefix === ''
       ? [{ name: 'app/', path: 'app/', isFolder: true }]
@@ -125,6 +125,34 @@ test('shows why a grant failed and keeps the form open', async () => {
   await user.click(screen.getByRole('button', { name: 'Grant' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('edited outside EnvBao')
   expect(screen.getByRole('form', { name: 'Grant access to this secret' })).toBeInTheDocument()
+})
+
+test('groups mounts by engine and shows the engine view for a dynamic mount', async () => {
+  vi.mocked(api.listMounts).mockResolvedValue([
+    { path: 'database/', type: 'database' },
+    { path: 'secret/', type: 'kv', version: '2' },
+    { path: 'cubbyhole/', type: 'cubbyhole' },
+  ])
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <SessionProvider>
+        <MemoryRouter>
+          <Connected />
+          <SecretsPage />
+        </MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  )
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'go' }))
+  const select = await screen.findByLabelText('Mount')
+  expect(within(select).getByRole('group', { name: 'KV' })).toBeInTheDocument()
+  expect(within(select).getByRole('group', { name: 'Database' })).toBeInTheDocument()
+  expect(within(select).queryByText('cubbyhole/')).not.toBeInTheDocument()
+
+  await user.selectOptions(select, 'database/')
+  expect(await screen.findByText(/Database engine at database\//)).toBeInTheDocument()
+  expect(api.listSecrets).not.toHaveBeenCalled()
 })
 
 test('asks to connect first', () => {
