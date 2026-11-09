@@ -33,7 +33,9 @@ describe.skipIf(!pg)('database engine against Postgres', () => {
     const read = await readConfig(client, mount, conn, 'app')
     expect(read).toMatchObject({ plugin_name: 'postgresql-database-plugin', username: pg!.values.username })
     expect(String(read!.connection_url)).toContain('{{username}}')
-    expect(JSON.stringify(read)).not.toContain(String(pg!.values.password))
+    // Not a substring search: CI's password ("postgres") is also the username and the hostname.
+    expect(read).not.toHaveProperty('password')
+    expect(JSON.stringify(read)).not.toContain(`:${String(pg!.values.password)}@`)
 
     // editing with the password left blank must keep the stored one, or the next credential request would fail
     const edit = draftFromRole(conn, 'app', read!)
