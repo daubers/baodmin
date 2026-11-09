@@ -27,3 +27,43 @@ path "auth/token/revoke-accessor" { capabilities = ["update"] }
 path "sys/auth"            { capabilities = ["read"] }
 path "sys/mounts"          { capabilities = ["read"] }
 path "secret/metadata/*"   { capabilities = ["list"] }
+
+# Dynamic secrets engines: roles, config, credentials and leases. The paths use the default mount
+# names (database/, aws/, ssh/); repeat a block with your own mount path for each engine you manage.
+# The creds/sign lines let this account issue live logins, keys and certificates; drop them to manage
+# roles without being able to use them.
+
+# database (postgres, ...)
+path "database/roles"          { capabilities = ["list"] }
+path "database/roles/*"        { capabilities = ["create", "read", "update", "delete"] }
+path "database/static-roles"   { capabilities = ["list"] }
+path "database/static-roles/*" { capabilities = ["create", "read", "update", "delete"] }
+path "database/config"         { capabilities = ["list"] }
+path "database/config/*"       { capabilities = ["create", "read", "update", "delete"] }
+path "database/rotate-root/*"  { capabilities = ["update"] }
+path "database/reset/*"        { capabilities = ["update"] }
+path "database/creds/*"        { capabilities = ["read"] }
+path "database/static-creds/*" { capabilities = ["read"] }
+
+# aws
+path "aws/roles"               { capabilities = ["list"] }
+path "aws/roles/*"             { capabilities = ["create", "read", "update", "delete"] }
+path "aws/config/root"         { capabilities = ["create", "read", "update"] }
+path "aws/config/lease"        { capabilities = ["create", "read", "update"] }
+path "aws/config/rotate-root"  { capabilities = ["update"] }
+path "aws/creds/*"             { capabilities = ["read", "update"] }
+
+# ssh
+path "ssh/roles"               { capabilities = ["list"] }
+path "ssh/roles/*"             { capabilities = ["create", "read", "update", "delete"] }
+path "ssh/config/ca"           { capabilities = ["create", "read", "update", "delete"] }
+path "ssh/sign/*"              { capabilities = ["update"] }
+path "ssh/creds/*"             { capabilities = ["update"] }
+
+# Leases: browse, inspect, renew and revoke what the engines have issued
+# (OpenBao requires sudo to list leases and to revoke by prefix)
+path "sys/leases/lookup"       { capabilities = ["update"] }
+path "sys/leases/lookup/*"     { capabilities = ["list", "sudo"] }
+path "sys/leases/renew"        { capabilities = ["update"] }
+path "sys/leases/revoke"       { capabilities = ["update"] }
+path "sys/leases/revoke-prefix/*" { capabilities = ["update", "sudo"] }

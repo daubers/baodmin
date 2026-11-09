@@ -10,8 +10,9 @@ The UI talks directly to the OpenBao HTTP API from the browser. There is no back
 
 - **Connect** with a token or a userpass login. Refuses sealed or uninitialised servers, and explains CORS and connection problems.
 - **Identities**: create, edit and delete userpass users, identity entities (with userpass aliases) and groups; create, list and revoke tokens. A new token's value is shown once.
-- **Secrets**: browse KV v2 mounts and paths (names only; secret values are never read) and see which identities can reach a secret, through which policy, with which capabilities.
-- **Access**: from an identity's **Access** button, grant it capabilities on a secret path (globs allowed) or revoke them, without writing policy HCL.
+- **Secrets**: browse KV v2 mounts and paths (names only; KV secret values are never read) and see which identities can reach a secret, through which policy, with which capabilities.
+- **Dynamic secrets**: for database (Postgres, ...), AWS and SSH engines, and a raw-JSON editor for any other engine type: create, edit and delete roles; configure the engine (database connections with rotate and reset, AWS root and lease, the SSH signing CA); generate credentials, sign SSH keys or issue OTPs; and browse, renew and revoke leases. Issued credentials are shown once and are never stored or cached by the UI. Passwords and private keys you type into config forms are write-only: they are never shown again.
+- **Access**: from an identity's **Access** button, grant it capabilities on a secret path (globs allowed) or access to a dynamic-engine role (generate credentials, manage the role), or revoke them, without writing policy HCL. A role's **Access** button shows who can already use it.
 - **Graph**: Identity → Policy → Path graph, filterable by identity and path. Click a policy→path edge to revoke that grant.
 
 ## Using it
@@ -84,6 +85,16 @@ bao auth enable userpass
 bao secrets enable -path=secret -version=2 kv   # skip if already mounted
 ```
 
+Dynamic engines are optional and appear under **Secrets** once mounted:
+
+```sh
+bao secrets enable database
+bao secrets enable ssh
+bao secrets enable aws     # see the note below
+```
+
+The AWS engine is not built into every OpenBao release (some ship it as an external plugin, and `bao secrets enable aws` fails with `plugin not found in the catalog`). Register the plugin first if yours needs it. The AWS screens follow the engine's documented API and are covered by unit tests only, not against a live AWS engine.
+
 ### Admin policy for the UI
 
 Least privilege for the account that uses the UI. The same policy is kept in [`docs/envbao-admin.hcl`](docs/envbao-admin.hcl), and the integration tests run every UI operation with only this policy, so it is known to be sufficient:
@@ -118,13 +129,55 @@ path "auth/token/revoke-accessor" { capabilities = ["update"] }
 path "sys/auth"            { capabilities = ["read"] }
 path "sys/mounts"          { capabilities = ["read"] }
 path "secret/metadata/*"   { capabilities = ["list"] }
+
+# Dynamic secrets engines: roles, config, credentials and leases. The paths use the default mount
+# names (database/, aws/, ssh/); repeat a block with your own mount path for each engine you manage.
+# The creds/sign lines let this account issue live logins, keys and certificates; drop them to manage
+# roles without being able to use them.
+
+# database (postgres, ...)
+path "database/roles"          { capabilities = ["list"] }
+path "database/roles/*"        { capabilities = ["create", "read", "update", "delete"] }
+path "database/static-roles"   { capabilities = ["list"] }
+path "database/static-roles/*" { capabilities = ["create", "read", "update", "delete"] }
+path "database/config"         { capabilities = ["list"] }
+path "database/config/*"       { capabilities = ["create", "read", "update", "delete"] }
+path "database/rotate-root/*"  { capabilities = ["update"] }
+path "database/reset/*"        { capabilities = ["update"] }
+path "database/creds/*"        { capabilities = ["read"] }
+path "database/static-creds/*" { capabilities = ["read"] }
+
+# aws
+path "aws/roles"               { capabilities = ["list"] }
+path "aws/roles/*"             { capabilities = ["create", "read", "update", "delete"] }
+path "aws/config/root"         { capabilities = ["create", "read", "update"] }
+path "aws/config/lease"        { capabilities = ["create", "read", "update"] }
+path "aws/config/rotate-root"  { capabilities = ["update"] }
+path "aws/creds/*"             { capabilities = ["read", "update"] }
+
+# ssh
+path "ssh/roles"               { capabilities = ["list"] }
+path "ssh/roles/*"             { capabilities = ["create", "read", "update", "delete"] }
+path "ssh/config/ca"           { capabilities = ["create", "read", "update", "delete"] }
+path "ssh/sign/*"              { capabilities = ["update"] }
+path "ssh/creds/*"             { capabilities = ["update"] }
+
+# Leases: browse, inspect, renew and revoke what the engines have issued
+# (OpenBao requires sudo to list leases and to revoke by prefix)
+path "sys/leases/lookup"       { capabilities = ["update"] }
+path "sys/leases/lookup/*"     { capabilities = ["list", "sudo"] }
+path "sys/leases/renew"        { capabilities = ["update"] }
+path "sys/leases/revoke"       { capabilities = ["update"] }
+path "sys/leases/revoke-prefix/*" { capabilities = ["update", "sudo"] }
 ```
 
 Notes:
 
 - Listing token accessors needs `sudo` in OpenBao, so the Tokens tab needs it on `auth/token/accessors`.
 - Creating **orphan** tokens (the "Orphan" checkbox) needs `sudo` on `auth/token/create`. It is deliberately not granted above; add `"sudo"` there if you want it.
-- If your KV v2 mount is not `secret/`, change `secret/metadata/*`.
+- If your KV v2 mount is not `secret/`, change `secret/metadata/*`. The dynamic-engine rules name the default mounts (`database/`, `aws/`, `ssh/`), so change those too, or repeat a block for each mount. They deliberately avoid a `+/roles/*` wildcard, which would also match system paths such as `sys/config/cors`.
+- Listing leases and revoking by prefix need `sudo` in OpenBao (looking up, renewing and revoking a single lease do not). Without it the Leases tab shows a permission error.
+- The `creds`, `sign` and `static-creds` lines let this account issue live database logins, AWS keys and SSH certificates. Remove them if the account should manage roles without being able to use them.
 - The account can create policies and attach them to identities, which is effectively the power to grant access to anything. Treat it as an administrator.
 
 ### Admin login
@@ -197,10 +250,11 @@ CI runs on Gitea Actions (`.gitea/workflows/ci.yml`): lint, test and build, plus
 ## Limitations
 
 - **Browser-direct**: CORS must be enabled on OpenBao, and the token lives in the browser's memory (never written to storage). There is no server-side audit trail beyond OpenBao's own audit log.
-- **Scope**: KV v2 only, and only userpass auth, tokens and identity entities/groups are managed.
+- **Scope**: KV v2 and the database, AWS and SSH dynamic engines (other engine types get a raw JSON role editor only, with no credential generation), and only userpass auth, tokens and identity entities/groups are managed. KV v1 is not shown.
+- **Credentials**: dynamic credentials appear once, in the browser, when generated; copy them then. Avoid generating them on a shared screen. Credentials without a lease (database static roles) cannot be revoked from the Leases tab.
 - **Managed policies**: access is granted by writing one policy per user, entity or group, named `envbao-<kind>-<name>` (for example `envbao-user-alice`). If a managed policy is edited outside EnvBao (for example to add parameter constraints) it becomes read-only in the UI rather than being overwritten. All other policies are shown read-only. Policy names are lower-cased by OpenBao, so identities whose names differ only by case or punctuation would collide; EnvBao detects this and refuses to overwrite.
 - **Tokens**: cannot be granted access after creation (OpenBao fixes a token's policies when it is created), so choose their policies when creating them. Tokens created by a token die with it unless created as orphans.
-- **Grants** write `<mount>/data/...` rules for read/create/update/delete and `<mount>/metadata/...` for list. `patch`, `sudo` and the KV `delete`/`undelete`/`destroy` sub-paths are not offered.
+- **Grants** write `<mount>/data/...` rules for read/create/update/delete and `<mount>/metadata/...` for list. `patch`, `sudo` and the KV `delete`/`undelete`/`destroy` sub-paths are not offered. For dynamic engines, *generate credentials* grants the credential paths of the role (`creds/<role>`, `static-creds/<role>`, or `sign/<role>` and `creds/<role>` for SSH) and *manage role* grants create/read/update/delete on `roles/<role>` plus list on `roles`. Engine-wide config and lease management are not grantable from the UI.
 - **Access model**: follows OpenBao's "most specific path wins" rule. Parameter constraints, control groups, MFA and templated paths are not evaluated (templated paths are approximated), so the access views can over-report for policies that use them; such policies are flagged.
 - **Inheritance**: identity→policy edges and the Access panel show *effective* policies, including those a user inherits from an aliased entity and that entity's groups. Nested groups and non-userpass aliases are not followed.
 - **Scale**: the graph and Access panel read every user, entity, group, token and policy on each load, with no pagination, so large instances may be slow.

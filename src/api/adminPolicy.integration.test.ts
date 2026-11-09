@@ -6,6 +6,11 @@ import * as ids from './identities'
 import * as secrets from './secrets'
 import * as tokens from './tokens'
 import { kvGrantRules } from '../model/managed'
+import { deleteConfig, readConfig, runAction } from './engines/config'
+import { generateCreds } from './engines/creds'
+import { listLeases, lookupLease, renewLease, revokeLease, revokePrefix } from './engines/leases'
+import { ENGINES } from './engines/registry'
+import { deleteRole, listRoles, readRole, writeRole } from './engines/roles'
 
 // Everything the UI does, run with ONLY docs/envbao-admin.hcl (plus the default policy), so the
 // documented least-privilege policy can't silently drift from what the app needs.
@@ -96,5 +101,57 @@ describe('the documented admin policy is sufficient for every UI operation', () 
     await expect(
       tokens.createToken(admin, { displayName: 'it-orphan', policies: ['default'], renewable: false, orphan: true }),
     ).rejects.toThrow(/sudo/)
+  })
+})
+
+// docs/envbao-admin.hcl names the default mounts, so this needs the ssh engine at ssh/. It mounts one if the
+// server has none (a dev server or CI), and skips rather than overwrite the CA of an ssh/ mount that was already there.
+describe('the admin policy covers dynamic engines (ssh at the default mount)', () => {
+  let mounted = false
+  const ssh = ENGINES.ssh
+  const role = ssh.roleKinds[0]
+  const sshRole = `it-pol-${sfx}`
+
+  beforeAll(async () => {
+    const mounts = await root.request<{ data: Record<string, unknown> }>('GET', 'sys/mounts')
+    if (!('ssh/' in mounts.data)) {
+      await root.request('POST', 'sys/mounts/ssh', { type: 'ssh' })
+      mounted = true
+    }
+  })
+  afterAll(async () => {
+    if (mounted) await root.request('DELETE', 'sys/mounts/ssh').catch(() => {})
+  })
+
+  test('config, roles, credentials and leases', async (ctx) => {
+    if (!mounted) ctx.skip()
+    const ca = ssh.configs[0]
+    expect(await readConfig(admin, 'ssh/', ca)).toBeNull()
+    await runAction(admin, 'ssh/', ca.actions![0])
+    expect((await readConfig(admin, 'ssh/', ca))?.public_key).toBeTruthy()
+
+    await writeRole(admin, 'ssh/', role, sshRole, { key_type: 'ca', allow_user_certificates: true, allowed_users: '*', default_user: 'alice' })
+    expect(await listRoles(admin, 'ssh/', role)).toContain(sshRole)
+    expect((await readRole(admin, 'ssh/', role, sshRole)).key_type).toBe('ca')
+    const key = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDI/MhHH9Rd3dBZwAa4gQOkxfuw0ogMWlO2G4rlINbfv it'
+    expect((await generateCreds(admin, 'ssh/', role.creds[0], sshRole, { public_key: key })).data.signed_key).toBeTruthy()
+
+    await writeRole(admin, 'ssh/', role, `${sshRole}-otp`, { key_type: 'otp', default_user: 'alice', cidr_list: '10.0.0.0/8' })
+    const otp = await generateCreds(admin, 'ssh/', role.creds[1], `${sshRole}-otp`, { ip: '10.0.0.9' })
+    expect((await listLeases(admin, 'ssh/creds/')).length).toBeGreaterThan(0)
+    expect((await lookupLease(admin, otp.leaseId)).id).toBe(otp.leaseId)
+    // OTP leases can't be renewed, so this fails; what matters is that it fails for that reason and not for permissions
+    const renewError = await renewLease(admin, otp.leaseId).then(() => null, (e: Error) => e.message)
+    expect(renewError).not.toBeNull()
+    expect(renewError).not.toMatch(/permission denied/)
+    await revokeLease(admin, otp.leaseId)
+
+    const again = await generateCreds(admin, 'ssh/', role.creds[1], `${sshRole}-otp`, { ip: '10.0.0.10' })
+    expect(again.leaseId).toBeTruthy()
+    await revokePrefix(admin, `ssh/creds/${sshRole}-otp/`)
+
+    await deleteRole(admin, 'ssh/', role, sshRole)
+    await deleteRole(admin, 'ssh/', role, `${sshRole}-otp`)
+    await deleteConfig(admin, 'ssh/', ca)
   })
 })
