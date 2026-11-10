@@ -43,6 +43,12 @@ test('shows issued credentials once, and keeps them out of every cache', async (
   expect(qc.getMutationCache().getAll()).toHaveLength(0)
 })
 
+test('a role that takes no input offers just Generate, with no raw JSON box', () => {
+  setup('database')
+  expect(screen.getByRole('form', { name: 'Generate credentials for ro' })).toBeInTheDocument()
+  expect(screen.queryByLabelText(/JSON/)).not.toBeInTheDocument()
+})
+
 test('revokes the lease on request', async () => {
   vi.mocked(creds.generateCreds).mockResolvedValue(issued)
   vi.mocked(leases.revokeLease).mockResolvedValue()

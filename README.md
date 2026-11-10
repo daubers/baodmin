@@ -6,6 +6,24 @@ Licensed under the [BSD 3-Clause License](LICENSE).
 
 The UI talks directly to the OpenBao HTTP API from the browser. There is no backend.
 
+## Documentation
+
+- [User guide](docs/user-guide.md): signing in, identities, giving access, secrets and dynamic engines, the graph.
+- [Administrator guide](docs/admin-guide.md): OpenBao setup, CORS, the admin policy, deployment and releases, security notes, troubleshooting.
+
+## Screenshots
+
+Taken from the [demo stack](#quick-start-with-docker).
+
+| | |
+| --- | --- |
+| ![Who can reach a secret](docs/screenshots/secret-access.jpg) | ![Access graph, one identity highlighted](docs/screenshots/graph-highlight.jpg) |
+| **Secrets**: who can reach a secret, and through which policy. | **Graph**: click a box to highlight every link from it. |
+| ![Granting access](docs/screenshots/access-grants.jpg) | ![Database roles](docs/screenshots/engine-roles.jpg) |
+| **Access**: grant or revoke without writing HCL. | **Dynamic secrets**: manage roles, generate credentials, browse leases. |
+| ![Credentials shown once](docs/screenshots/generate-credentials.jpg) | ![Create a secrets engine](docs/screenshots/new-engine.jpg) |
+| **Generate**: credentials are shown once and never stored. | **Secrets engines**: create, change and delete mounts. |
+
 ## What it does
 
 - **Connect** with a token or a userpass login. Refuses sealed or uninitialised servers, and explains CORS and connection problems.

@@ -99,6 +99,8 @@ export function RoleEditor({
   noun = 'role',
   showName = true,
   nameLabel,
+  title: titleOverride,
+  rawJson = true,
   submitLabel = 'Save',
   draft,
   pending,
@@ -114,6 +116,10 @@ export function RoleEditor({
   showName?: boolean
   /** Label for the name field; defaults to "<Noun> name". */
   nameLabel?: string
+  /** Replaces the generated form title. */
+  title?: string
+  /** Show a raw JSON box when the schema has no fields (generic engines). False for forms that take no input. */
+  rawJson?: boolean
   submitLabel?: string
   draft: RoleDraft
   pending: boolean
@@ -122,7 +128,7 @@ export function RoleEditor({
   onSubmit: () => void
   onCancel: () => void
 }) {
-  const title = draft.isNew ? `New ${noun}` : showName ? `Edit ${draft.name}` : `Edit ${noun}`
+  const title = titleOverride ?? (draft.isNew ? `New ${noun}` : showName ? `Edit ${draft.name}` : `Edit ${noun}`)
   function submit(e: FormEvent) {
     e.preventDefault()
     onSubmit()
@@ -137,10 +143,12 @@ export function RoleEditor({
         </label>
       )}
       {kind.fields.length === 0 ? (
-        <label>
-          Role (JSON)
+        rawJson && (
+          <label>
+            Role (JSON)
           <textarea value={draft.json} onChange={(e) => onChange({ ...draft, json: e.target.value })} rows={10} spellCheck={false} />
-        </label>
+          </label>
+        )
       ) : (
         kind.fields.map((f) => (
           <Field

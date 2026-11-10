@@ -79,6 +79,8 @@ export function GenerateCreds({
         key={kind.id}
         kind={{ fields: kind.inputs }}
         noun={`${kind.label.toLowerCase()} for ${role}`}
+        title={`${kind.label} for ${role}`}
+        rawJson={false}
         showName={false}
         submitLabel="Generate"
         draft={draft}

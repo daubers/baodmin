@@ -18,7 +18,7 @@ function LeaseRow({ client, id, name, onChanged }: { client: BaoClient; id: stri
   const revoke = useMutation({ mutationFn: () => revokeLease(client, id), onSuccess: onChanged })
 
   return (
-    <li>
+    <li className="lease-row">
       <span>{name}</span>
       <button type="button" aria-expanded={open} aria-label={`Details ${name}`} onClick={() => setOpen(!open)}>
         Details

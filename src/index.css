@@ -491,6 +491,39 @@ td:last-child button + button {
   border-radius: 0;
 }
 
+/* A lease is a row with its own actions, not a folder link: undo the full-width entry button style. */
+.entries .lease-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s4);
+}
+
+.entries .lease-row > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+}
+
+.entries .lease-row button {
+  display: inline-block;
+  width: auto;
+  padding: 0.4rem var(--s3);
+  text-align: center;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+}
+
+.entries .lease-row > :is(p, dl) {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 .entries [aria-pressed='true'] {
   background: var(--accent-soft);
   color: var(--accent);
