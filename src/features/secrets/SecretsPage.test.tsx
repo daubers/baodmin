@@ -15,7 +15,7 @@ import { SecretsPage } from './SecretsPage'
 
 vi.mock('../../api/grants')
 vi.mock('../../api/identities')
-vi.mock('../../api/secrets', async (orig) => ({ ...(await orig<typeof api>()), listMounts: vi.fn(), listSecrets: vi.fn(), readPolicyHcl: vi.fn() }))
+vi.mock('../../api/secrets', async (orig) => ({ ...(await orig<typeof api>()), listMounts: vi.fn(), listSecrets: vi.fn(), readPolicyHcl: vi.fn(), writeSecret: vi.fn() }))
 vi.mock('../../api/tokens')
 vi.mock('../../api/mounts', async (orig) => ({ ...(await orig<typeof mountsApi>()), createMount: vi.fn(), tuneMount: vi.fn(), readKvConfig: vi.fn(), deleteMount: vi.fn(), mountImpact: vi.fn() }))
 
@@ -291,4 +291,29 @@ test('asks to connect first', () => {
     </QueryClientProvider>,
   )
   expect(screen.getByText(/Not connected/)).toBeInTheDocument()
+})
+
+test('adds a new secret under the current folder', async () => {
+  vi.mocked(api.writeSecret).mockResolvedValue()
+  const user = userEvent.setup()
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <SessionProvider>
+        <MemoryRouter>
+          <Connected />
+          <SecretsPage />
+        </MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  )
+  await user.click(screen.getByRole('button', { name: 'go' }))
+  await user.click(await screen.findByRole('button', { name: 'app/' }))
+  await user.click(await screen.findByRole('button', { name: 'New secret' }))
+  await user.click(screen.getByRole('button', { name: 'Create' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('Name is required.')
+  await user.type(screen.getByLabelText(/^Name/), 'expo')
+  await user.type(screen.getByLabelText('Key 1'), 'TOKEN')
+  await user.type(screen.getByLabelText('Value 1'), 's3cret')
+  await user.click(screen.getByRole('button', { name: 'Create' }))
+  expect(api.writeSecret).toHaveBeenCalledWith(client, 'secret/', 'app/expo', { TOKEN: 's3cret' })
 })

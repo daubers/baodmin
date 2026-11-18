@@ -86,13 +86,13 @@ For each identity, EnvBao keeps one policy named `envbao-<kind>-<name>` (for exa
 **Secrets** is where you browse and manage secrets engines. At the top:
 
 - **New secrets engine** adds a mount (see [Managing secrets engines](#managing-secrets-engines)).
-- The **Secrets engine** drop-down chooses which engine to work with, with **Settings** and **Delete** for that engine beside it.
+- The **Secrets engine** drop-down chooses which engine to work with, with **Settings**, **Delete** and (for KV) **New secret** for that engine beside it.
 
 For a **KV** engine you browse folders and secrets with the breadcrumb under the toolbar. Select a secret to see **who can reach it**: every identity with access, through which policy, and with which capabilities. **Grant access** on that panel opens the grant form for the secret.
 
 ![Who can reach a secret](screenshots/secret-access.jpg)
 
-EnvBao shows secret **names only**. It never reads or displays a secret's value. OpenBao applies the most specific matching policy path, and the table follows the same rule. It does not evaluate parameter constraints, control groups, MFA or templated paths (templated paths are approximated), so a policy using those may be over-reported and is flagged.
+**New secret** (KV engines) adds a secret under the current folder: type a name such as `expo` and one or more key/value pairs. Values are write-only. EnvBao never reads or displays a secret's value, and it refuses to overwrite an existing secret. OpenBao applies the most specific matching policy path, and the table follows the same rule. It does not evaluate parameter constraints, control groups, MFA or templated paths (templated paths are approximated), so a policy using those may be over-reported and is flagged.
 
 ## Dynamic secrets engines
 
@@ -162,7 +162,7 @@ If creating a KV engine succeeds but saving its KV settings fails, the page says
 ## Good to know
 
 - **Copy it now.** Tokens and generated credentials are shown once only.
-- **Names, not values.** Secret values are never shown.
+- **Write-only values.** Secret values can be created but are never shown, and existing secrets can't be changed here.
 - **Whole-instance reads.** The graph and Access panels read every user, entity, group, token and policy each time they load, which can be slow on very large instances.
 - **Not everything is managed here.** Auth methods other than userpass, nested groups and non-userpass aliases are not followed, and KV v1 mounts are not shown. See the README's limitations for the full list.
 - **Policies you did not create are read-only.** Change those with the OpenBao CLI.

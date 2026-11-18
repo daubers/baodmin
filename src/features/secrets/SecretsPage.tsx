@@ -9,6 +9,7 @@ import { AccessPanel } from './AccessPanel'
 import { DeleteMountDialog } from './DeleteMountDialog'
 import { EngineView } from './EngineView'
 import { MountDialog } from './MountDialog'
+import { NewSecretDialog } from './NewSecretDialog'
 
 function Browser({ client }: { client: BaoClient }) {
   const mounts = useMounts(client)
@@ -16,7 +17,7 @@ function Browser({ client }: { client: BaoClient }) {
   const [mountChoice, setMount] = useState<string | null>(null)
   const [prefix, setPrefix] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
-  const [dialog, setDialog] = useState<'create' | 'edit' | 'delete' | null>(null)
+  const [dialog, setDialog] = useState<'create' | 'edit' | 'delete' | 'secret' | null>(null)
 
   const current = mounts.data?.find((m) => m.path === mountChoice) ?? mounts.data?.[0] ?? null
   const mount = current?.path ?? null
@@ -58,7 +59,7 @@ function Browser({ client }: { client: BaoClient }) {
         go('')
       }}
     />
-  ) : dialog && dialog !== 'delete' && (
+  ) : dialog && dialog !== 'delete' && dialog !== 'secret' && (
     <MountDialog
       // Remount per mount so one mount's settings are never shown (or saved) for another.
       key={dialog === 'edit' ? current?.path : 'create'}
@@ -132,12 +133,32 @@ function Browser({ client }: { client: BaoClient }) {
               Settings
             </button>
           )}
+          {isKv && (
+            <button type="button" onClick={() => setDialog(dialog === 'secret' ? null : 'secret')} aria-expanded={dialog === 'secret'}>
+              New secret
+            </button>
+          )}
           <button type="button" onClick={() => setDialog(dialog === 'delete' ? null : 'delete')} aria-expanded={dialog === 'delete'}>
             Delete
           </button>
         </div>
       </div>
       {dialogs}
+      {dialog === 'secret' && isKv && (
+        <NewSecretDialog
+          key={`${mount}${prefix}`}
+          client={client}
+          mount={mount}
+          prefix={prefix}
+          onClose={closeDialog}
+          onDone={(path) => {
+            closeDialog()
+            const folder = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : ''
+            setPrefix(folder)
+            setSelected(path)
+          }}
+        />
+      )}
     </>
   )
 

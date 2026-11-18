@@ -42,3 +42,14 @@ export function policiesReferencing(policies: PolicyText[], mount: string): stri
     .map((p) => p.name)
     .sort((a, b) => a.localeCompare(b))
 }
+
+/** Error message for a secret name/path (relative to a KV mount) that can't be used, or null. */
+export function validateSecretPath(path: string): string | null {
+  if (!path.trim()) return 'Name is required.'
+  if (path !== path.trim()) return 'Name must not start or end with spaces.'
+  if (path.startsWith('/') || path.endsWith('/')) return 'Name must not start or end with "/".'
+  const parts = path.split('/')
+  if (parts.some((p) => !p)) return 'Name must not contain empty parts ("//").'
+  if (parts.some((p) => p === '.' || p === '..')) return 'Name must not contain "." or ".." parts.'
+  return null
+}

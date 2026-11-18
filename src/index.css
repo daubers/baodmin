@@ -1573,3 +1573,16 @@ button.danger-solid:hover:not(:disabled) {
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
+
+/* New secret form: key/value rows. */
+.kv-rows {
+  display: grid;
+  gap: var(--s2);
+  margin: var(--s3) 0;
+}
+
+.kv-row {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+}

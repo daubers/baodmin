@@ -28,7 +28,7 @@ Taken from the [demo stack](#quick-start-with-docker).
 
 - **Connect** with a token or a userpass login. Refuses sealed or uninitialised servers, and explains CORS and connection problems.
 - **Identities**: create, edit and delete userpass users, identity entities (with userpass aliases) and groups; create, list and revoke tokens. A new token's value is shown once.
-- **Secrets**: browse KV v2 mounts and paths (names only; KV secret values are never read) and see which identities can reach a secret, through which policy, with which capabilities.
+- **Secrets**: browse KV v2 mounts and paths and add new secrets (values are write-only: existing values are never read, shown or overwritten) and see which identities can reach a secret, through which policy, with which capabilities.
 - **Secrets engines**: create (KV v2, database, AWS, SSH), change the settings of, and delete secrets engine mounts, including KV v2 settings such as max versions. Deleting asks you to type the mount path, and says what will be lost and which policies still refer to it.
 - **Dynamic secrets**: for database (Postgres, ...), AWS and SSH engines, and a raw-JSON editor for any other engine type: create, edit and delete roles; configure the engine (database connections with rotate and reset, AWS root and lease, the SSH signing CA); generate credentials, sign SSH keys or issue OTPs; and browse, renew and revoke leases. Issued credentials are shown once and are never stored or cached by the UI. Passwords and private keys you type into config forms are write-only: they are never shown again.
 - **Access**: from an identity's **Access** button, grant it capabilities on a secret path (globs allowed) or access to a dynamic-engine role (generate credentials, manage the role), or revoke them, without writing policy HCL. A role's **Access** button shows who can already use it.
@@ -161,6 +161,8 @@ path "sys/mounts/*"        { capabilities = ["create", "read", "update", "delete
 # KV v2 settings (max versions, check-and-set) of the KV mount
 path "secret/config"       { capabilities = ["read", "update"] }
 path "secret/metadata/*"   { capabilities = ["list"] }
+# Creating a new KV v2 secret. Create only: values can't be read back and existing secrets can't be overwritten
+path "secret/data/*"       { capabilities = ["create"] }
 
 # Dynamic secrets engines: roles, config, credentials and leases. The paths use the default mount
 # names (database/, aws/, ssh/); repeat a block with your own mount path for each engine you manage.
@@ -209,7 +211,7 @@ Notes:
 - Creating **orphan** tokens (the "Orphan" checkbox) needs `sudo` on `auth/token/create`. It is deliberately not granted above; add `"sudo"` there if you want it.
 - The `sys/mounts/*` rule lets this account create, change and **delete any secrets engine**, which destroys its data and revokes its leases. Remove it (and the New / Settings / Delete buttons will report permission denied) if mounts are managed elsewhere. Mounting, tuning and deleting do not need `sudo`.
 - KV v2 settings (max versions, check-and-set) are stored by the engine at `<mount>/config`, so the policy only covers them on `secret/`. Creating another KV store with settings mounts it and then fails to save them; EnvBao tells you the store exists, and you can add `<mount>/config` to the policy and use **Settings**.
-- If your KV v2 mount is not `secret/`, change `secret/metadata/*` and `secret/config`. The dynamic-engine rules name the default mounts (`database/`, `aws/`, `ssh/`), so change those too, or repeat a block for each mount. They deliberately avoid a `+/roles/*` wildcard, which would also match system paths such as `sys/config/cors`.
+- If your KV v2 mount is not `secret/`, change `secret/metadata/*`, `secret/data/*` and `secret/config`. The dynamic-engine rules name the default mounts (`database/`, `aws/`, `ssh/`), so change those too, or repeat a block for each mount. They deliberately avoid a `+/roles/*` wildcard, which would also match system paths such as `sys/config/cors`.
 - Listing leases and revoking by prefix need `sudo` in OpenBao (looking up, renewing and revoking a single lease do not). Without it the Leases tab shows a permission error.
 - The `creds`, `sign` and `static-creds` lines let this account issue live database logins, AWS keys and SSH certificates. Remove them if the account should manage roles without being able to use them.
 - The account can create policies and attach them to identities, which is effectively the power to grant access to anything. Treat it as an administrator.

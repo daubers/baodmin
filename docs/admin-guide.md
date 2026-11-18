@@ -120,7 +120,7 @@ Required secrets: in `envbao-admin`, `PKGS_USER`, `PKGS_PASSWORD` and `DEPLOY_DI
 
 - **Token handling.** The token lives in memory only and is sent only to the OpenBao URL you entered. Anyone who can run script in the page (an XSS bug, a malicious browser extension) could use it, so keep the CSP and serve the UI from a dedicated origin.
 - **Credentials shown once.** Tokens and dynamic credentials appear when created and are never stored or cached by the UI. Password and private-key fields in configuration forms are write-only.
-- **Secret values are never read.** The Secrets page lists names and metadata only. It cannot display KV secret values.
+- **Secret values are write-only.** The Secrets page lists names and metadata only and cannot display KV secret values. **New secret** creates a secret (with `cas: 0`, so it can never overwrite one) and needs only `create` on `<mount>/data/*`.
 - **Audit.** The UI has no audit trail of its own. Turn on an OpenBao audit device; every UI action appears there under the signed-in account.
 - **Session length.** Sessions last as long as the token. Give the admin account a short TTL if you want people to sign in more often.
 - **Managed policies.** Grants are stored as policies named `envbao-<kind>-<name>` with an `# envbao-owner:` header. If someone edits one outside EnvBao, the UI treats it as read-only rather than overwrite it. Other policies are shown read-only.

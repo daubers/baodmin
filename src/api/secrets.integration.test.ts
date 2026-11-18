@@ -71,3 +71,13 @@ describe('access model vs sys/capabilities-self', () => {
     }
   })
 })
+
+describe('writeSecret', () => {
+  test('creates a secret once and refuses to overwrite it', async () => {
+    const path = `it-${sfx}/new/expo`
+    await secrets.writeSecret(client, 'secret/', path, { TOKEN: 'v1' })
+    await expect(secrets.writeSecret(client, 'secret/', path, { TOKEN: 'v2' })).rejects.toThrow()
+    const res = await client.request<{ data: { data: Record<string, string> } }>('GET', `secret/data/${path}`)
+    expect(res.data.data).toEqual({ TOKEN: 'v1' })
+  })
+})

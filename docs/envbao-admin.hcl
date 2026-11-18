@@ -33,6 +33,8 @@ path "sys/mounts/*"        { capabilities = ["create", "read", "update", "delete
 # KV v2 settings (max versions, check-and-set) of the KV mount
 path "secret/config"       { capabilities = ["read", "update"] }
 path "secret/metadata/*"   { capabilities = ["list"] }
+# Creating a new KV v2 secret. Create only: values can't be read back and existing secrets can't be overwritten
+path "secret/data/*"       { capabilities = ["create"] }
 
 # Dynamic secrets engines: roles, config, credentials and leases. The paths use the default mount
 # names (database/, aws/, ssh/); repeat a block with your own mount path for each engine you manage.

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { policiesReferencing, validateMountPath } from './mounts'
+import { policiesReferencing, validateMountPath, validateSecretPath } from './mounts'
 
 const existing = ['secret/', 'database/', 'team/kv/']
 
@@ -37,4 +37,9 @@ test('finds policies with rules under a mount, however the mount is written', ()
   expect(policiesReferencing(policies, 'secret/')).toEqual(['a-uses', 'b-uses'])
   expect(policiesReferencing(policies, 'secret')).toEqual(['a-uses', 'b-uses'])
   expect(policiesReferencing(policies, 'nothing/')).toEqual([])
+})
+
+test('validateSecretPath accepts plain and nested names and rejects bad ones', () => {
+  for (const p of ['expo', 'shell/expo', 'a b']) expect(validateSecretPath(p), p).toBeNull()
+  for (const p of ['', ' x', '/x', 'x/', 'a//b', 'a/../b', '.']) expect(validateSecretPath(p), p).not.toBeNull()
 })

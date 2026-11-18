@@ -72,6 +72,14 @@ export async function listSecrets(c: BaoClient, mount: string, prefix: string): 
 /** API path of a secret's data, which is what ACL policies are written against. */
 export const dataPath = (mount: string, secret: string) => `${mount}data/${secret}`
 
+/**
+ * Creates a new KV v2 secret. `cas: 0` makes OpenBao refuse if the secret already exists, so this can never
+ * overwrite a value (and only needs the `create` capability).
+ */
+export async function writeSecret(c: BaoClient, mount: string, path: string, data: Record<string, string>): Promise<void> {
+  await c.request('POST', dataPath(mount, enc(path)), { data, options: { cas: 0 } })
+}
+
 export async function readPolicyHcl(c: BaoClient, name: string): Promise<string | null> {
   try {
     const res = await c.request<{ data: { policy: string } }>('GET', `sys/policies/acl/${encodeURIComponent(name)}`)
